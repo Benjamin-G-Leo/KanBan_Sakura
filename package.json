@@ -1,0 +1,14 @@
+{
+  "name": "tester",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green \"PORT=3002 npm --prefix backend run dev\" \"VITE_API_URL=http://localhost:3002/api/tasks npm --prefix frontend run dev -- --host 0.0.0.0\"",
+    "dev:backend": "PORT=3002 npm --prefix backend run dev",
+    "dev:frontend": "VITE_API_URL=http://localhost:3002/api/tasks npm --prefix frontend run dev -- --host 0.0.0.0",
+    "start:backend": "PORT=3002 npm --prefix backend run start",
+    "build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
