@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useKanban } from '../context/KanbanContext';
 
 export function TaskCard({ task, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || '');
+  const { handleBreakdown, breakingDown, toggleSubtasksVisibility, toggleSubtask } = useKanban();
 
   const handleSave = () => {
     onUpdate(task.id, { title: editTitle, description: editDesc });
@@ -16,51 +18,189 @@ export function TaskCard({ task, onUpdate, onDelete }) {
     setIsEditing(false);
   };
 
+  const isBreakingDown = breakingDown === task.id;
+  const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+  const showSubtasks = task.showSubtasks && hasSubtasks;
   const priorityClass = task.priority === 'high' ? 'high' : task.priority === 'low' ? 'low' : 'medium';
   const isAI = task.isAI || task.isAiGenerated;
 
+  const completedSubtasks = hasSubtasks ? task.subtasks.filter(st => st.completed).length : 0;
+
   return (
-    <div className={`glass-card task-card ${isAI ? 'is-ai-generated' : ''}`}>
-      <div className="flex items-start gap-3">
-        <div className={`task-priority-indicator ${priorityClass}`} />
-        <div className="task-content flex-1 min-w-0">
+    <div className={'glass-card task-card ' + (isAI ? 'is-ai-generated ' : '') + (isBreakingDown ? 'breaking-down' : '')}>
+      <div className='flex items-start gap-3'>
+        <div className={'task-priority-indicator ' + priorityClass} />
+        <div className='task-content flex-1 min-w-0'>
           {isEditing ? (
-            <form className="task-edit-form" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+            <form className='task-edit-form' onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
               <input
-                type="text"
+                type='text'
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full px-3 py-2 text-sm"
+                className='w-full px-3 py-2 text-sm'
                 autoFocus
               />
               <textarea
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
-                className="w-full px-3 py-2 text-sm resize-none"
+                className='w-full px-3 py-2 text-sm resize-none'
                 rows={2}
               />
-              <div className="form-actions">
-                <button type="submit" className="save">Save</button>
-                <button type="button" className="cancel" onClick={handleCancel}>Cancel</button>
+              <div className='form-actions'>
+                <button type='submit' className='save'>Save</button>
+                <button type='button' className='cancel' onClick={handleCancel}>Cancel</button>
               </div>
             </form>
           ) : (
             <>
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="task-title flex-1">{task.title}</h4>
-                {isAI && <span className="ai-badge flex-shrink-0">AI</span>}
+              <div className='flex items-start justify-between gap-2'>
+                <h4 className='task-title flex-1'>{task.title}</h4>
+                <div className='flex items-center gap-2 flex-shrink-0'>
+                  {isAI && <span className='ai-badge flex-shrink-0'>AI</span>}
+                  {hasSubtasks && (
+                    <span className='subtask-count' style={{
+                      fontSize: '0.625rem',
+                      color: 'var(--text-muted)',
+                      background: 'var(--glass-bg-column)',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px',
+                      border: '1px solid var(--glass-border-card)'
+                    }}>
+                      {completedSubtasks}/{task.subtasks.length}
+                    </span>
+                  )}
+                </div>
               </div>
-              {task.description && <p className="task-description">{task.description}</p>}
-              <div className="task-actions">
+              {task.description && <p className='task-description'>{task.description}</p>}
+              
+              {hasSubtasks && (
+                <div className='subtasks-container' style={{ marginTop: 'var(--space-sm)' }}>
+                  <button
+                    onClick={() => toggleSubtasksVisibility(task.id)}
+                    className='subtasks-toggle'
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-sm)',
+                      padding: 'var(--space-xs) var(--space-sm)',
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'color var(--transition-fast), background var(--transition-fast)',
+                    }}
+                    onMouseEnter={(e) => { e.target.style.color = 'var(--text-primary)'; e.target.style.background = 'var(--glass-bg-column)'; }}
+                    onMouseLeave={(e) => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'transparent'; }}
+                  >
+                    <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' style={{ transform: showSubtasks ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform var(--transition-fast)' }}>
+                      <polyline points='6 9 12 15 18 9' />
+                    </svg>
+                    {showSubtasks ? 'Hide' : 'Show'} Subtasks ({completedSubtasks}/{task.subtasks.length})
+                  </button>
+                  
+                  {showSubtasks && (
+                    <ul className='subtasks-list' style={{ 
+                      marginTop: 'var(--space-sm)', 
+                      paddingLeft: 'var(--space-lg)',
+                      borderLeft: '1px solid var(--glass-border-card)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--space-xs)'
+                    }}>
+                      {task.subtasks.map((subtask) => (
+                        <li key={subtask.id} className='subtask-item' style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 'var(--space-sm)',
+                          padding: 'var(--space-xs) var(--space-sm)',
+                          background: 'var(--glass-bg-column)',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--glass-border-card)',
+                          transition: 'background var(--transition-fast), border-color var(--transition-fast)',
+                        }}>
+                          <input
+                            type='checkbox'
+                            checked={subtask.completed}
+                            onChange={() => toggleSubtask(task.id, subtask.id)}
+                            style={{
+                              width: '1rem',
+                              height: '1rem',
+                              accentColor: 'var(--priority-medium)',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{
+                            flex: 1,
+                            fontSize: '0.8125rem',
+                            color: subtask.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+                            textDecoration: subtask.completed ? 'line-through' : 'none',
+                            transition: 'color var(--transition-fast)',
+                          }}>
+                            {subtask.title}
+                          </span>
+                          {subtask.description && (
+                            <span style={{
+                              fontSize: '0.6875rem',
+                              color: 'var(--text-muted)',
+                              maxWidth: '200px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}>
+                              {subtask.description}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              
+              <div className='task-actions'>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="task-action-btn"
+                  className='task-action-btn'
                 >
                   Edit
                 </button>
                 <button
+                  onClick={() => handleBreakdown(task)}
+                  disabled={isBreakingDown}
+                  className='task-action-btn breakdown-btn'
+                  style={{
+                    color: 'var(--priority-medium)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-xs)',
+                    fontWeight: '500',
+                  }}
+                >
+                  {isBreakingDown ? (
+                    <>
+                      <span className='breakdown-spinner' style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid var(--glass-border-column)',
+                        borderTopColor: 'var(--priority-medium)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                      }} />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '0.875rem' }}>✦</span>
+                      Breakdown
+                    </>
+                  )}
+                </button>
+                <button
                   onClick={() => onDelete(task.id)}
-                  className="task-action-btn delete"
+                  className='task-action-btn delete'
                 >
                   Delete
                 </button>
@@ -69,6 +209,20 @@ export function TaskCard({ task, onUpdate, onDelete }) {
           )}
         </div>
       </div>
+      
+      {isBreakingDown && (
+        <div className='breakdown-overlay' style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'var(--ai-shimmer)',
+          backgroundSize: '200% 100%',
+          borderRadius: 'inherit',
+          opacity: 0.3,
+          animation: 'ai-shimmer 1.5s linear infinite',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }} />
+      )}
     </div>
   );
 }

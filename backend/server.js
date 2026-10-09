@@ -1,13 +1,23 @@
 import express from 'express';
 import cors from 'cors';
+import aiRoutes from './routes/aiRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const VALID_STATUSES = ['todo', 'in-progress', 'review', 'done'];
 const VALID_PRIORITIES = ['low', 'medium', 'high'];
 
-app.use(cors());
+// CORS configuration for frontend integration
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+// Mount AI routes
+app.use('/api/ai', aiRoutes);
 
 let tasks = [
   { id: 1, title: 'Set up project structure', description: 'Create frontend and backend folders', status: 'done', priority: 'high' },
