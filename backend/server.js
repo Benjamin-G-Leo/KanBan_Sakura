@@ -18,9 +18,13 @@ let tasks = [
   { id: 6, title: 'Implement drag and drop', description: 'Add @dnd-kit for column/task reordering', status: 'review', priority: 'medium' },
   { id: 7, title: 'Add AI task suggestions', description: 'Integrate AI for task breakdown', status: 'todo', priority: 'low' },
   { id: 8, title: 'Polish responsive design', description: 'Ensure mobile/desktop layouts work', status: 'todo', priority: 'low' },
+  { id: 9, title: 'Auto-generate task breakdown', description: 'AI-generated subtasks for complex features', status: 'todo', priority: 'high', isAI: true },
+  { id: 10, title: 'Smart priority sorting', description: 'AI-powered task prioritization based on deadlines', status: 'in-progress', priority: 'medium', isAI: true },
+  { id: 11, title: 'Automated code review', description: 'AI-generated code quality suggestions', status: 'review', priority: 'high', isAI: true },
+  { id: 12, title: 'Predictive timeline estimation', description: 'AI-generated sprint velocity predictions', status: 'done', priority: 'low', isAI: true },
 ];
 
-let nextId = 9;
+let nextId = 13;
 
 const normalizeString = (value, fallback = '') => typeof value === 'string' ? value.trim() : fallback;
 
@@ -56,13 +60,14 @@ app.post('/api/tasks', (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
-  const { title, description = '', status = 'todo', priority = 'medium' } = validation.value;
+  const { title, description = '', status = 'todo', priority = 'medium', isAI = false } = validation.value;
   const task = {
     id: nextId++,
     title: normalizeString(title),
     description: normalizeString(description, ''),
     status: VALID_STATUSES.includes(status) ? status : 'todo',
     priority: VALID_PRIORITIES.includes(priority) ? priority : 'medium',
+    isAI: Boolean(isAI),
   };
 
   tasks.push(task);
@@ -85,6 +90,7 @@ app.patch('/api/tasks/:id', (req, res) => {
   if (updatedTask.description !== undefined) updatedTask.description = normalizeString(updatedTask.description, '');
   if (updatedTask.status !== undefined) updatedTask.status = VALID_STATUSES.includes(updatedTask.status) ? updatedTask.status : tasks[index].status;
   if (updatedTask.priority !== undefined) updatedTask.priority = VALID_PRIORITIES.includes(updatedTask.priority) ? updatedTask.priority : tasks[index].priority;
+  if (updatedTask.isAI !== undefined) updatedTask.isAI = Boolean(updatedTask.isAI);
 
   tasks[index] = updatedTask;
   res.json(tasks[index]);

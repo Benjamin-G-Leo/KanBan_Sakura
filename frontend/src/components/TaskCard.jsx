@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { PRIORITY_COLORS } from './constants';
 
 export function TaskCard({ task, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -17,45 +16,51 @@ export function TaskCard({ task, onUpdate, onDelete }) {
     setIsEditing(false);
   };
 
+  const priorityClass = task.priority === 'high' ? 'high' : task.priority === 'low' ? 'low' : 'medium';
+  const isAI = task.isAI || task.isAiGenerated;
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-3 relative">
-      <div className="flex items-start gap-2">
-        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${PRIORITY_COLORS[task.priority] || PRIORITY_COLORS.medium}`} />
-        <div className="flex-1 min-w-0">
+    <div className={`glass-card task-card ${isAI ? 'is-ai-generated' : ''}`}>
+      <div className="flex items-start gap-3">
+        <div className={`task-priority-indicator ${priorityClass}`} />
+        <div className="task-content flex-1 min-w-0">
           {isEditing ? (
-            <div className="space-y-2">
+            <form className="task-edit-form" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 text-sm"
                 autoFocus
               />
               <textarea
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
-                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-3 py-2 text-sm resize-none"
                 rows={2}
               />
-              <div className="flex gap-1">
-                <button onClick={handleSave} className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">Save</button>
-                <button onClick={handleCancel} className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+              <div className="form-actions">
+                <button type="submit" className="save">Save</button>
+                <button type="button" className="cancel" onClick={handleCancel}>Cancel</button>
               </div>
-            </div>
+            </form>
           ) : (
             <>
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm mb-1">{task.title}</h4>
-              {task.description && <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{task.description}</p>}
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="task-title flex-1">{task.title}</h4>
+                {isAI && <span className="ai-badge flex-shrink-0">AI</span>}
+              </div>
+              {task.description && <p className="task-description">{task.description}</p>}
+              <div className="task-actions">
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  className="task-action-btn"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onDelete(task.id)}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  className="task-action-btn delete"
                 >
                   Delete
                 </button>

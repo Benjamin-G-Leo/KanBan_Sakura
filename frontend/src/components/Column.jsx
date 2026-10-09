@@ -2,19 +2,17 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TaskCard } from './TaskCard';
 import { AddTaskForm } from './AddTaskForm';
-import { COLUMNS } from './constants';
 
-export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete }) {
-  const columnConfig = COLUMNS.find(c => c.id === columnId);
-
+export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onTaskAdd }) {
   return (
-    <div className={`flex-1 min-w-[280px] max-w-[320px] ${columnConfig?.color || 'bg-gray-100'} rounded-xl p-3`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm uppercase tracking-wider">
-          {title} <span className="text-gray-500 dark:text-gray-400 font-normal">({tasks.length})</span>
+    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px] flex flex-col`}>
+      <div className="column-header">
+        <h3 className="column-title">
+          {title}
+          <span className="column-count">{tasks.length}</span>
         </h3>
       </div>
-      <div className="space-y-2 min-h-[200px]">
+      <div className="task-list flex-1 space-y-2 min-h-[200px] overflow-y-auto">
         {tasks.map((task) => (
           <SortableTaskCard
             key={task.id}
@@ -25,7 +23,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete }) {
           />
         ))}
       </div>
-      <AddTaskForm columnId={columnId} onAdd={() => {}} />
+      <AddTaskForm columnId={columnId} onAdd={onTaskAdd} />
     </div>
   );
 }
