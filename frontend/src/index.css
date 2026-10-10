@@ -45,7 +45,7 @@
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-md);
+  --glass-blur-card: var(--glass-blur-lg);
 
   /* Background layer for pixel art */
   --pixel-bg-opacity: 1;
@@ -97,7 +97,7 @@
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-md);
+  --glass-blur-card: var(--glass-blur-lg);
 
   --pixel-bg-opacity: 1;
 
@@ -146,7 +146,7 @@
   --glass-border-card-hover: rgba(15, 23, 42, 0.12);
   --glass-shadow-card: 0 2px 12px rgba(15, 23, 42, 0.06);
   --glass-shadow-card-hover: 0 8px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.08);
-  --glass-blur-card: var(--glass-blur-md);
+  --glass-blur-card: var(--glass-blur-lg);
 
   --pixel-bg-opacity: 0.8;
 
@@ -394,6 +394,8 @@ body {
 }
 
 .kanban-column {
+  position: relative;
+  z-index: 1;
   background: var(--glass-bg-column);
   backdrop-filter: blur(var(--glass-blur-column));
   -webkit-backdrop-filter: blur(var(--glass-blur-column));
@@ -543,6 +545,8 @@ body {
 }
 
 .task-card {
+  position: relative;
+  z-index: 1;
   padding: var(--space-md);
   display: flex;
   gap: var(--space-sm);

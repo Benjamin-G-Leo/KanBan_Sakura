@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 
-function createParticle(width, height, theme, reducedMotion) {
-  const size = Math.random() * 2 + 3;
+function createParticle(width, height, theme) {
+  const size = 4;
   const colors = theme === 'dark'
     ? ['#f472b6', '#f9a8d4', '#fbcfe8', '#fce7f3', '#fff1f7']
     : ['#ec4899', '#db2777', '#be185d', '#9d174d', '#831843'];
 
   return {
     x: Math.random() * width,
-    y: reducedMotion ? Math.random() * height : -size - Math.random() * 100,
+    y: Math.random() * height,
     size,
     speedY: Math.random() * 0.8 + 0.4,
     speedX: (Math.random() - 0.5) * 0.6,
     color: colors[Math.floor(Math.random() * colors.length)],
     rotation: Math.random() * Math.PI * 2,
     rotationSpeed: (Math.random() - 0.5) * 0.02,
-    opacity: Math.random() * 0.4 + 0.3,
+    opacity: Math.random() * 0.3 + 0.55,
     sway: Math.random() * Math.PI * 2,
     swaySpeed: Math.random() * 0.01 + 0.005,
     swayAmount: Math.random() * 1.5 + 0.5,
@@ -57,10 +57,10 @@ export function PixelArtBackground() {
     let height = 0;
 
     const initializeParticles = () => {
-      const count = Math.min(Math.floor((width * height) / 15000), 80);
+      const count = Math.max(24, Math.min(Math.ceil((width * height) / 10000), 120));
       particlesRef.current = Array.from(
         { length: count },
-        () => createParticle(width, height, theme, reducedMotion),
+        () => createParticle(width, height, theme),
       );
     };
 
@@ -79,7 +79,7 @@ export function PixelArtBackground() {
             || particle.x < -particle.size
             || particle.x > width + particle.size
           ) {
-            particlesRef.current[index] = createParticle(width, height, theme, false);
+            particlesRef.current[index] = createParticle(width, height, theme);
             particlesRef.current[index].y = -particle.size;
             return;
           }
@@ -90,13 +90,7 @@ export function PixelArtBackground() {
         ctx.rotate(particle.rotation);
         ctx.globalAlpha = particle.opacity * (reducedMotion ? 0.5 : 1);
         ctx.fillStyle = particle.color;
-        const pixelSize = Math.max(1, Math.floor(particle.size / 2));
-        const halfSize = particle.size / 2;
-        for (let x = -halfSize; x < halfSize; x += pixelSize) {
-          for (let y = -halfSize; y < halfSize; y += pixelSize) {
-            if (Math.random() > 0.1) ctx.fillRect(x, y, pixelSize, pixelSize);
-          }
-        }
+        ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
         ctx.restore();
       });
     };
@@ -121,17 +115,20 @@ export function PixelArtBackground() {
 
     resize();
     if (!reducedMotion) animationRef.current = requestAnimationFrame(animate);
+    const resizeObserver = new ResizeObserver(resize);
+    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
     window.addEventListener('resize', resize);
 
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', resize);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [reducedMotion, theme]);
 
   const gradient = theme === 'dark'
-    ? 'linear-gradient(180deg, rgba(9,13,22,0.4) 0%, rgba(15,23,42,0.6) 50%, rgba(30,27,75,0.8) 100%)'
-    : 'linear-gradient(180deg, rgba(255,241,247,0.4) 0%, rgba(252,231,243,0.6) 50%, rgba(251,207,232,0.8) 100%)';
+    ? 'linear-gradient(180deg, rgba(9,13,22,0.12) 0%, rgba(15,23,42,0.24) 50%, rgba(30,27,75,0.44) 100%)'
+    : 'linear-gradient(180deg, rgba(255,241,247,0.12) 0%, rgba(252,231,243,0.24) 50%, rgba(251,207,232,0.44) 100%)';
 
   return (
     <div
