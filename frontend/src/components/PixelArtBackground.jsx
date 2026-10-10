@@ -1,31 +1,79 @@
 import { useEffect, useRef, useState } from 'react';
 
-function createParticle(width, height, theme) {
-  const size = 4;
-  const colors = theme === 'dark'
-    ? ['#f472b6', '#f9a8d4', '#fbcfe8', '#fce7f3', '#fff1f7']
-    : ['#ec4899', '#db2777', '#be185d', '#9d174d', '#831843'];
+const PETAL_COUNT = 36;
+const PETAL_SIZE = 4;
 
+function createPetal(width, height, startInView = true) {
   return {
     x: Math.random() * width,
-    y: Math.random() * height,
-    size,
-    speedY: Math.random() * 0.8 + 0.4,
-    speedX: (Math.random() - 0.5) * 0.6,
-    color: colors[Math.floor(Math.random() * colors.length)],
-    rotation: Math.random() * Math.PI * 2,
-    rotationSpeed: (Math.random() - 0.5) * 0.02,
-    opacity: Math.random() * 0.3 + 0.55,
+    y: startInView ? Math.random() * height : -PETAL_SIZE,
+    drift: 0.45 + Math.random() * 0.65,
+    fall: 0.35 + Math.random() * 0.55,
     sway: Math.random() * Math.PI * 2,
-    swaySpeed: Math.random() * 0.01 + 0.005,
-    swayAmount: Math.random() * 1.5 + 0.5,
+    swaySpeed: 0.012 + Math.random() * 0.012,
+    color: ['#f472b6', '#f9a8d4', '#fbcfe8', '#ec4899'][Math.floor(Math.random() * 4)],
+    opacity: 0.55 + Math.random() * 0.35,
+    size: PETAL_SIZE + (Math.random() > 0.8 ? 1 : 0),
   };
+}
+
+function drawLandscape(ctx, width, height, theme, time) {
+  const dark = theme === 'dark';
+  const sky = ctx.createLinearGradient(0, 0, 0, height);
+  sky.addColorStop(0, dark ? '#10182a' : '#fce7f3');
+  sky.addColorStop(0.56, dark ? '#26334c' : '#fbcfe8');
+  sky.addColorStop(1, dark ? '#172d42' : '#bfdbfe');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, width, height);
+
+  const block = Math.max(8, Math.round(width / 90));
+  const horizon = height * 0.54;
+  ctx.fillStyle = dark ? '#26364a' : '#94a3b8';
+  for (let x = 0; x < width; x += block * 2) {
+    const peak = horizon - (Math.sin(x * 0.009) * 0.045 + 0.08) * height;
+    ctx.fillRect(x, peak, block * 3, height - peak);
+  }
+
+  const riverTop = height * 0.63;
+  ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
+  ctx.fillRect(0, riverTop, width, height - riverTop);
+  ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
+  for (let row = 0; row < 9; row += 1) {
+    const y = riverTop + row * ((height - riverTop) / 9) + block;
+    const offset = (time * (0.018 + row * 0.002) + row * block * 3) % (block * 12);
+    for (let x = -block * 12 + offset; x < width; x += block * 12) {
+      ctx.fillRect(x, y, block * (2 + (row % 3)), Math.max(2, block / 3));
+    }
+  }
+
+  const treeX = width * 0.78;
+  const trunkTop = height * 0.19;
+  ctx.fillStyle = dark ? '#423246' : '#783f55';
+  ctx.fillRect(treeX, trunkTop + height * 0.16, block * 2, height * 0.35);
+  ctx.fillRect(treeX - block * 4, trunkTop + height * 0.38, block * 5, block * 2);
+  ctx.fillRect(treeX + block, trunkTop + height * 0.27, block * 5, block * 2);
+
+  const blossoms = dark
+    ? ['#9d4b78', '#c45b91', '#e883b2', '#f6b5cf']
+    : ['#be185d', '#db2777', '#ec4899', '#f9a8d4'];
+  const canopy = [
+    [-6, 2], [-5, 0], [-4, -2], [-3, 1], [-2, -3], [-1, -1], [0, -4],
+    [1, -2], [2, -4], [3, -2], [4, -1], [5, 1], [6, 3],
+    [-5, 3], [-4, 4], [-3, 2], [-2, 0], [-1, 2], [0, 0],
+    [1, 1], [2, -1], [3, 1], [4, 3], [5, 4], [-2, 4], [2, 3],
+  ];
+  canopy.forEach(([column, row], index) => {
+    ctx.fillStyle = blossoms[(index + Math.floor(time / 1500)) % blossoms.length];
+    ctx.fillRect(treeX + column * block, trunkTop + row * block, block * 3, block * 2);
+  });
+
+  ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
+  ctx.fillRect(0, riverTop - block, width, block * 2);
 }
 
 export function PixelArtBackground() {
   const canvasRef = useRef(null);
-  const animationRef = useRef(null);
-  const particlesRef = useRef([]);
+  const frameRef = useRef(null);
   const [theme, setTheme] = useState(
     () => document.documentElement.getAttribute('data-theme') || 'dark',
   );
@@ -36,15 +84,14 @@ export function PixelArtBackground() {
   useEffect(() => {
     const root = document.documentElement;
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handleMotionChange = (event) => setReducedMotion(event.matches);
-    const handleThemeChange = () => setTheme(root.getAttribute('data-theme') || 'dark');
+    const updateTheme = () => setTheme(root.getAttribute('data-theme') || 'dark');
+    const updateMotion = (event) => setReducedMotion(event.matches);
 
-    mediaQuery.addEventListener('change', handleMotionChange);
-    root.addEventListener('themechange', handleThemeChange);
-
+    root.addEventListener('themechange', updateTheme);
+    mediaQuery.addEventListener('change', updateMotion);
     return () => {
-      mediaQuery.removeEventListener('change', handleMotionChange);
-      root.removeEventListener('themechange', handleThemeChange);
+      root.removeEventListener('themechange', updateTheme);
+      mediaQuery.removeEventListener('change', updateMotion);
     };
   }, []);
 
@@ -55,90 +102,61 @@ export function PixelArtBackground() {
 
     let width = 0;
     let height = 0;
+    let petals = [];
+    let lastFrame = 0;
 
-    const initializeParticles = () => {
-      const count = Math.max(24, Math.min(Math.ceil((width * height) / 10000), 120));
-      particlesRef.current = Array.from(
-        { length: count },
-        () => createParticle(width, height, theme),
-      );
-    };
-
-    const draw = (advanceParticles) => {
+    const render = (timestamp = 0) => {
+      const elapsed = lastFrame ? Math.min(timestamp - lastFrame, 40) : 16;
+      lastFrame = timestamp;
       ctx.clearRect(0, 0, width, height);
+      drawLandscape(ctx, width, height, theme, timestamp);
 
-      particlesRef.current.forEach((particle, index) => {
-        if (advanceParticles) {
-          particle.y += particle.speedY;
-          particle.x += particle.speedX + Math.sin(particle.sway) * particle.swayAmount * 0.02;
-          particle.sway += particle.swaySpeed;
-          particle.rotation += particle.rotationSpeed;
-
-          if (
-            particle.y > height + particle.size
-            || particle.x < -particle.size
-            || particle.x > width + particle.size
-          ) {
-            particlesRef.current[index] = createParticle(width, height, theme);
-            particlesRef.current[index].y = -particle.size;
-            return;
+      petals.forEach((petal) => {
+        if (!reducedMotion) {
+          petal.sway += petal.swaySpeed * elapsed;
+          petal.x -= (petal.drift + Math.sin(petal.sway) * 0.22) * elapsed * 0.06;
+          petal.y += petal.fall * elapsed * 0.06;
+          if (petal.y > height + petal.size || petal.x < -petal.size) {
+            Object.assign(petal, createPetal(width, height, false), {
+              x: Math.random() * width + width * 0.08,
+            });
           }
         }
 
-        ctx.save();
-        ctx.translate(particle.x, particle.y);
-        ctx.rotate(particle.rotation);
-        ctx.globalAlpha = particle.opacity * (reducedMotion ? 0.5 : 1);
-        ctx.fillStyle = particle.color;
-        ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
-        ctx.restore();
+        ctx.globalAlpha = petal.opacity;
+        ctx.fillStyle = petal.color;
+        ctx.fillRect(Math.round(petal.x), Math.round(petal.y), petal.size, petal.size);
       });
+      ctx.globalAlpha = 1;
+
+      if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
     };
 
     const resize = () => {
-      const rect = canvas.parentElement?.getBoundingClientRect();
-      width = rect?.width || window.innerWidth;
-      height = rect?.height || window.innerHeight;
-      const pixelRatio = window.devicePixelRatio || 1;
-
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width || window.innerWidth;
+      height = rect.height || window.innerHeight;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(width * pixelRatio);
       canvas.height = Math.round(height * pixelRatio);
       ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-      initializeParticles();
-      draw(false);
-    };
-
-    const animate = () => {
-      draw(true);
-      animationRef.current = requestAnimationFrame(animate);
+      petals = Array.from({ length: PETAL_COUNT }, () => createPetal(width, height));
+      lastFrame = 0;
+      if (reducedMotion) render();
     };
 
     resize();
-    if (!reducedMotion) animationRef.current = requestAnimationFrame(animate);
-    const resizeObserver = new ResizeObserver(resize);
-    if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
+    if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
     window.addEventListener('resize', resize);
-
     return () => {
-      resizeObserver.disconnect();
       window.removeEventListener('resize', resize);
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
   }, [reducedMotion, theme]);
 
-  const gradient = theme === 'dark'
-    ? 'linear-gradient(180deg, rgba(9,13,22,0.12) 0%, rgba(15,23,42,0.24) 50%, rgba(30,27,75,0.44) 100%)'
-    : 'linear-gradient(180deg, rgba(255,241,247,0.12) 0%, rgba(252,231,243,0.24) 50%, rgba(251,207,232,0.44) 100%)';
-
   return (
-    <div
-      className="pixel-art-bg"
-      role="img"
-      aria-label={reducedMotion ? 'Static decorative sakura blossoms' : 'Animated falling sakura blossoms'}
-      aria-hidden="true"
-    >
+    <div className="pixel-art-bg" aria-hidden="true">
       <canvas ref={canvasRef} />
-      <div className="pixel-art-gradient" style={{ background: gradient }} />
     </div>
   );
 }

@@ -37,7 +37,7 @@
   --glass-bg-column: rgba(15, 23, 42, 0.45);
   --glass-border-column: rgba(255, 255, 255, 0.08);
   --glass-shadow-column: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --glass-blur-column: var(--glass-blur-xl);
+  --glass-blur-column: var(--glass-blur-md);
 
   --glass-bg-card: rgba(15, 23, 42, 0.55);
   --glass-bg-card-hover: rgba(15, 23, 42, 0.7);
@@ -45,7 +45,7 @@
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-lg);
+  --glass-blur-card: var(--glass-blur-md);
 
   /* Background layer for pixel art */
   --pixel-bg-opacity: 1;
@@ -89,7 +89,7 @@
   --glass-bg-column: rgba(255, 255, 255, 0.05);
   --glass-border-column: rgba(255, 255, 255, 0.08);
   --glass-shadow-column: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --glass-blur-column: var(--glass-blur-xl);
+  --glass-blur-column: var(--glass-blur-md);
 
   --glass-bg-card: rgba(255, 255, 255, 0.07);
   --glass-bg-card-hover: rgba(255, 255, 255, 0.12);
@@ -97,7 +97,7 @@
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-lg);
+  --glass-blur-card: var(--glass-blur-md);
 
   --pixel-bg-opacity: 1;
 
@@ -138,7 +138,7 @@
   --glass-bg-column: rgba(255, 255, 255, 0.55);
   --glass-border-column: rgba(255, 255, 255, 0.5);
   --glass-shadow-column: 0 4px 24px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
-  --glass-blur-column: var(--glass-blur-xl);
+  --glass-blur-column: var(--glass-blur-md);
 
   --glass-bg-card: rgba(255, 255, 255, 0.65);
   --glass-bg-card-hover: rgba(255, 255, 255, 0.85);
@@ -146,7 +146,7 @@
   --glass-border-card-hover: rgba(15, 23, 42, 0.12);
   --glass-shadow-card: 0 2px 12px rgba(15, 23, 42, 0.06);
   --glass-shadow-card-hover: 0 8px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.08);
-  --glass-blur-card: var(--glass-blur-lg);
+  --glass-blur-card: var(--glass-blur-md);
 
   --pixel-bg-opacity: 0.8;
 
@@ -191,11 +191,14 @@
 
 .pixel-art-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  opacity: var(--pixel-bg-opacity);
+  mix-blend-mode: normal;
   transition: opacity var(--transition-slow);
 }
 
