@@ -8,7 +8,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
   const { setNodeRef } = useDroppable({ id: columnId });
 
   return (
-    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px] flex flex-col`}>
+    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px]`}>
       <div className="column-header">
         <h3 className="column-title">
           {title}
@@ -16,7 +16,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
         </h3>
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="task-list flex-1 space-y-2 min-h-[200px] overflow-y-auto">
+        <div ref={setNodeRef} className="cards-container">
           {tasks.map((task) => (
             <SortableTaskCard
               key={task.id}

@@ -399,6 +399,10 @@ body {
 .kanban-column {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
   background: var(--glass-bg-column);
   backdrop-filter: blur(var(--glass-blur-column));
   -webkit-backdrop-filter: blur(var(--glass-blur-column));
@@ -422,11 +426,23 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
+  padding: 0 var(--space-xs) 0.75rem;
   border-bottom: 1px solid var(--glass-border-column);
-  margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)) var(--space-md);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  background: rgba(255, 255, 255, 0.02);
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 200px;
+  overflow-y: auto;
+}
+
+.cards-container > * {
+  flex: 0 0 auto;
 }
 
 .column-title {
