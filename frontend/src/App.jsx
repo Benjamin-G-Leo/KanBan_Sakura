@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { KanbanProvider, useKanban } from './context/KanbanContext';
+import { PixelArtBackground } from './components/PixelArtBackground';
 
 function SuggestionsDrawer() {
   const { suggestionsOpen, suggestions, suggestionsLoading, toggleSuggestions } = useKanban();
@@ -179,7 +180,7 @@ function SuggestionsDrawer() {
                         color: 'var(--text-secondary)',
                         lineHeight: 1.5,
                       }}>
-                        {suggestion.description || suggestion.detail || ''}
+                        {suggestion.description || suggestion.detail || suggestion.recommendation || ''}
                       </p>
                     </div>
                   </div>
@@ -210,10 +211,12 @@ function AppContent() {
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
+    document.documentElement.dispatchEvent(new CustomEvent('themechange'));
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="app-wrapper min-h-screen">
+      <PixelArtBackground />
       <header className="app-header px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">

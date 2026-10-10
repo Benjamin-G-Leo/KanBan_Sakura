@@ -22,6 +22,7 @@
   --glass-blur-sm: 8px;
   --glass-blur-md: 16px;
   --glass-blur-lg: 20px;
+  --glass-blur-xl: 24px;
 
   --bg-primary: #090d16;
   --bg-secondary: #0f172a;
@@ -36,7 +37,7 @@
   --glass-bg-column: rgba(15, 23, 42, 0.45);
   --glass-border-column: rgba(255, 255, 255, 0.08);
   --glass-shadow-column: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --glass-blur-column: var(--glass-blur-lg);
+  --glass-blur-column: var(--glass-blur-xl);
 
   --glass-bg-card: rgba(15, 23, 42, 0.55);
   --glass-bg-card-hover: rgba(15, 23, 42, 0.7);
@@ -44,7 +45,10 @@
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-sm);
+  --glass-blur-card: var(--glass-blur-md);
+
+  /* Background layer for pixel art */
+  --pixel-bg-opacity: 1;
 
   --priority-high: #ef4444;
   --priority-medium: #fbbf24;
@@ -82,18 +86,20 @@
   --text-muted: #64748b;
   --text-inverse: #0f172a;
 
-  --glass-bg-column: rgba(15, 23, 42, 0.45);
+  --glass-bg-column: rgba(255, 255, 255, 0.05);
   --glass-border-column: rgba(255, 255, 255, 0.08);
   --glass-shadow-column: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --glass-blur-column: var(--glass-blur-lg);
+  --glass-blur-column: var(--glass-blur-xl);
 
-  --glass-bg-card: rgba(15, 23, 42, 0.55);
-  --glass-bg-card-hover: rgba(15, 23, 42, 0.7);
+  --glass-bg-card: rgba(255, 255, 255, 0.07);
+  --glass-bg-card-hover: rgba(255, 255, 255, 0.12);
   --glass-border-card: rgba(255, 255, 255, 0.1);
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
-  --glass-blur-card: var(--glass-blur-sm);
+  --glass-blur-card: var(--glass-blur-md);
+
+  --pixel-bg-opacity: 1;
 
   --priority-high: #ef4444;
   --priority-medium: #fbbf24;
@@ -129,18 +135,20 @@
   --text-muted: #94a3b8;
   --text-inverse: #f1f5f9;
 
-  --glass-bg-column: rgba(255, 255, 255, 0.65);
+  --glass-bg-column: rgba(255, 255, 255, 0.55);
   --glass-border-column: rgba(255, 255, 255, 0.5);
   --glass-shadow-column: 0 4px 24px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.05);
-  --glass-blur-column: var(--glass-blur-lg);
+  --glass-blur-column: var(--glass-blur-xl);
 
-  --glass-bg-card: rgba(255, 255, 255, 0.75);
-  --glass-bg-card-hover: rgba(255, 255, 255, 0.9);
+  --glass-bg-card: rgba(255, 255, 255, 0.65);
+  --glass-bg-card-hover: rgba(255, 255, 255, 0.85);
   --glass-border-card: rgba(15, 23, 42, 0.06);
   --glass-border-card-hover: rgba(15, 23, 42, 0.12);
   --glass-shadow-card: 0 2px 12px rgba(15, 23, 42, 0.06);
   --glass-shadow-card-hover: 0 8px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.08);
-  --glass-blur-card: var(--glass-blur-sm);
+  --glass-blur-card: var(--glass-blur-md);
+
+  --pixel-bg-opacity: 0.8;
 
   --priority-high: #dc2626;
   --priority-medium: #d97706;
@@ -170,6 +178,63 @@
    ======================================== */
 * {
   box-sizing: border-box;
+}
+
+/* ========================================
+   APP WRAPPER & PIXEL ART BACKGROUND
+   ======================================== */
+.app-wrapper {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+}
+
+.pixel-art-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: var(--pixel-bg-opacity);
+  transition: opacity var(--transition-slow);
+}
+
+.pixel-art-bg canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pixel-art-gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Ensure main content sits above background */
+.app-wrapper > header,
+.app-wrapper > main {
+  position: relative;
+  z-index: 10;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pixel-art-bg {
+    opacity: 0.3;
+  }
+
+  .pixel-art-bg canvas {
+    animation: none !important;
+  }
+}
+
+/* Print styles - hide background */
+@media print {
+  .pixel-art-bg {
+    display: none;
+  }
 }
 
 html {

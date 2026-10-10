@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { API_URL } from '../components/constants';
+import { API_URL, COLUMNS } from '../components/constants';
 import { getTaskBreakdown, getWorkflowSuggestions, createTaskFromAI } from '../services/aiService';
 
 const KanbanContext = createContext(null);
@@ -87,7 +87,17 @@ export function KanbanProvider({ children }) {
     try {
       const res = await fetch(API_URL);
       const data = await res.json();
-      dispatch({ type: 'SET_TASKS', payload: data });
+      const orderedTasks = data
+        .map((task, index) => ({ task, index }))
+        .sort((left, right) => {
+          const leftColumn = COLUMNS.findIndex((column) => column.id === left.task.status);
+          const rightColumn = COLUMNS.findIndex((column) => column.id === right.task.status);
+          if (leftColumn !== rightColumn) return leftColumn - rightColumn;
+          return (left.task.order ?? Infinity) - (right.task.order ?? Infinity)
+            || left.index - right.index;
+        })
+        .map(({ task }) => task);
+      dispatch({ type: 'SET_TASKS', payload: orderedTasks });
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -135,12 +145,14 @@ export function KanbanProvider({ children }) {
       const activeTask = state.tasks.find((t) => t.id === activeId);
       const overTask = state.tasks.find((t) => t.id === overId);
 
-      if (!activeTask || !overTask) return;
-
+      if (!activeTask) return;
+      const overColumn = overTask?.status ?? COLUMNS.find((column) => column.id === overId)?.id;
+      if (!overColumn) return;
       const activeColumn = activeTask.status;
-      const overColumn = overTask.status;
 
       if (activeColumn === overColumn) {
+        if (!overTask || activeId === overId) return;
+
         const columnTasks = state.tasks.filter((t) => t.status === activeColumn);
         const oldIndex = columnTasks.findIndex((t) => t.id === activeId);
         const newIndex = columnTasks.findIndex((t) => t.id === overId);
@@ -150,17 +162,56 @@ export function KanbanProvider({ children }) {
         reordered.splice(newIndex, 0, removed);
 
         const updates = reordered.map((t, i) => ({ id: t.id, order: i }));
-        dispatch({ type: 'REORDER_TASKS', payload: state.tasks.map((t) => {
-          const update = updates.find((u) => u.id === t.id);
-          return update ? { ...t, order: update.order } : t;
-        }) });
+        let index = 0;
+        dispatch({
+          type: 'REORDER_TASKS',
+          payload: state.tasks.map((task) => (
+            task.status === activeColumn
+              ? { ...reordered[index], order: index++ }
+              : task
+          )),
+        });
 
-        for (const update of updates) {
-          await handleTaskUpdate(update.id, { order: update.order });
-        }
+        await Promise.all(updates.map((update) => handleTaskUpdate(update.id, { order: update.order })));
       } else {
-        dispatch({ type: 'UPDATE_TASK', payload: { ...activeTask, status: overColumn } });
-        await handleTaskUpdate(activeId, { status: overColumn });
+        const sourceTasks = state.tasks.filter((task) => task.status === activeColumn && task.id !== activeId);
+        const destinationTasks = state.tasks.filter((task) => task.status === overColumn && task.id !== activeId);
+        const insertAt = overTask
+          ? destinationTasks.findIndex((task) => task.id === overId)
+          : destinationTasks.length;
+        destinationTasks.splice(insertAt < 0 ? destinationTasks.length : insertAt, 0, {
+          ...activeTask,
+          status: overColumn,
+        });
+
+        const updates = [
+          ...sourceTasks.map((task, order) => ({ id: task.id, order })),
+          ...destinationTasks.map((task, order) => ({
+            id: task.id,
+            order,
+            ...(task.id === activeId ? { status: overColumn } : {}),
+          })),
+        ];
+        const orderedById = new Map(updates.map((update) => [update.id, update]));
+        const nextTasks = state.tasks
+          .filter((task) => task.id !== activeId)
+          .map((task) => {
+            const update = orderedById.get(task.id);
+            return update ? { ...task, order: update.order } : task;
+          });
+        const insertionIndex = overTask
+          ? nextTasks.findIndex((task) => task.id === overId)
+          : nextTasks.length;
+        nextTasks.splice(insertionIndex < 0 ? nextTasks.length : insertionIndex, 0, {
+          ...activeTask,
+          status: overColumn,
+          order: destinationTasks.findIndex((task) => task.id === activeId),
+        });
+
+        dispatch({ type: 'REORDER_TASKS', payload: nextTasks });
+        await Promise.all(updates.map(({ id, order, status }) => (
+          handleTaskUpdate(id, { order, ...(status ? { status } : {}) })
+        )));
       }
     },
     [state.tasks, handleTaskUpdate]

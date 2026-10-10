@@ -1,9 +1,12 @@
-import { useSortable } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TaskCard } from './TaskCard';
 import { AddTaskForm } from './AddTaskForm';
 
 export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onTaskAdd }) {
+  const { setNodeRef } = useDroppable({ id: columnId });
+
   return (
     <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px] flex flex-col`}>
       <div className="column-header">
@@ -12,17 +15,19 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
           <span className="column-count">{tasks.length}</span>
         </h3>
       </div>
-      <div className="task-list flex-1 space-y-2 min-h-[200px] overflow-y-auto">
-        {tasks.map((task) => (
-          <SortableTaskCard
-            key={task.id}
-            id={task.id}
-            task={task}
-            onUpdate={onTaskUpdate}
-            onDelete={onTaskDelete}
-          />
-        ))}
-      </div>
+      <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+        <div ref={setNodeRef} className="task-list flex-1 space-y-2 min-h-[200px] overflow-y-auto">
+          {tasks.map((task) => (
+            <SortableTaskCard
+              key={task.id}
+              id={task.id}
+              task={task}
+              onUpdate={onTaskUpdate}
+              onDelete={onTaskDelete}
+            />
+          ))}
+        </div>
+      </SortableContext>
       <AddTaskForm columnId={columnId} onAdd={onTaskAdd} />
     </div>
   );
