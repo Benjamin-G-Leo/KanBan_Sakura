@@ -8,11 +8,9 @@
     "frontend": {
       "root": "frontend",
       "framework": "vite",
-      "buildCommand": "npm run build",
-      "outputDirectory": "dist",
-      "env": {
-        "VITE_API_URL": "/api"
-      }
+      "buildCommand": "VITE_API_URL=/api npm run build",
+      "devCommand": "VITE_API_URL=/api npm run dev -- --host 0.0.0.0",
+      "outputDirectory": "dist"
     }
   },
   "rewrites": [

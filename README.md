@@ -214,8 +214,10 @@ npm run build
 
 This project is configured for **Vercel multi-service deployment** via `vercel.json`:
 
-- **`backend` service** (internal): Express API at `/api/*`
-- **`frontend` service** (public): Vite SPA at `/*`
+- **`backend` service**: Express API, exposed through the `/api/*` rewrite
+- **`frontend` service**: Vite SPA, exposed through the catch-all `/*` rewrite
+
+The frontend calls the backend from the browser using the same-origin `/api` path. The backend does not make server-to-server calls, so no Vercel service binding is needed. The frontend's `VITE_API_URL` is set to `/api` in its Vercel build and development commands.
 
 ### Deploy
 ```bash
@@ -226,18 +228,9 @@ vercel --prod
 
 ### Local Development with Vercel CLI
 ```bash
-vercel dev
+vercel dev -L
 # Runs both services locally with proper routing
 ```
-
-### Environment Variables
-
-| Variable | Frontend (VITE_API_URL) | Backend |
-|----------|------------------------|---------|
-| Local | `http://localhost:3001/api` | CORS: localhost:5173/5174 |
-| Production | `/api` (relative) | Same-origin via rewrite |
-
-> **Note**: In production, the frontend uses relative `/api/*` paths which Vercel rewrites to the backend service. No CORS config needed for production URL since both services share the same domain.
 
 ## Phase Progress
 
