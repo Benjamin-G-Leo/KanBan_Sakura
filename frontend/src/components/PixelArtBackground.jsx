@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
-const PETAL_COUNT = 36;
-const STAR_COUNT = 72;
-const CLOUD_COUNT = 4;
+const PETAL_COUNT = 48;
+const STAR_COUNT = 96;
+const CLOUD_COUNT = 6;
+const TREE_COUNT_PER_LAYER = 8;
+const CANOPY_LAYERS = 3;
+const TRUNK_BLOCK = 2;
+const BRANCH_BLOCK = 1;
 const THEME_TRANSITION_MS = 900;
 
+// Petal creation function
 function createPetal(width, height, startInView = true) {
   return {
     x: Math.random() * width,
@@ -18,23 +23,33 @@ function createPetal(width, height, startInView = true) {
   };
 }
 
-function createStars() {
-  return Array.from({ length: STAR_COUNT }, () => ({
-    x: Math.random(),
-    y: Math.random() * 0.58,
-    size: Math.random() > 0.86 ? 3 : 2,
-    phase: Math.random() * Math.PI * 2,
-    speed: 0.0008 + Math.random() * 0.0018,
-  }));
+// Color utility functions
+function getLeafColor(index, theme) {
+  const darkColors = ['#8f4778', '#bd5a91', '#e483ad', '#f3b1ca'];
+  const lightColors = ['#d44c82', '#f06f9b', '#ff8da1', '#ffb7c5'];
+  const colors = theme === 'dark' ? darkColors : lightColors;
+  return colors[index % colors.length];
 }
 
-function createClouds() {
-  return Array.from({ length: CLOUD_COUNT }, (_, index) => ({
-    x: index * 0.31 + Math.random() * 0.12,
-    y: 0.13 + Math.random() * 0.26,
-    scale: 0.75 + Math.random() * 0.65,
-    speed: 0.000008 + Math.random() * 0.00001,
-  }));
+function getStarColor(index, theme, time) {
+  const darkColors = ['#f8fafc', '#f1f5f9', '#e2e8f0'];
+  const lightColors = ['#2d3748', '#4a5568', '#64748b'];
+  const colors = theme === 'dark' ? darkColors : lightColors;
+  // Twinkling effect based on time
+  const twinkle = Math.sin(time * 0.001 + index) > 0 ? 0 : 1;
+  return {
+    color: colors[index % colors.length],
+    opacity: 0.8 + twinkle * 0.2,
+  };
+}
+
+function lightenColor(color, factor) {
+  const num = parseInt(color.replace('#', ''), 16);
+  const amt = Math.round(255 * factor);
+  const r = Math.min(255, ((num >> 16) + amt) | 0);
+  const g = Math.min(255, (((num >> 8) & 0x0000ff) + amt) | 0);
+  const b = Math.min(255, ((num & 0x000000ff) + amt) | 0);
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
 }
 
 function drawPixelTree(ctx, height, block, x, baseY, scale, theme, time, treeIndex) {
@@ -93,13 +108,146 @@ function drawPixelTree(ctx, height, block, x, baseY, scale, theme, time, treeInd
     ctx.fillRect(clusterX + unit * 1.4, clusterY + unit * 1.8, size * 0.6, unit);
   });
 
-  endpoints.forEach(([branchX, branchY], index) => {
-    ctx.fillStyle = canopyColors[(index + treeIndex) % canopyColors.length];
-    ctx.fillRect(branchX - unit * 1.4, branchY - unit * 1.5, unit * 3.2, unit * 2.5);
+  renderForestLayers(ctx, width, height, theme, time) {
+  const dark = theme === 'dark';
+  const unit = 32;
+  const trunkBlock = TRUNK_BLOCK;
+  const branchBlock = BRANCH_BLOCK;
+
+  // Layer configs: foreground, midground, background
+  const layerConfigs = [
+    {
+      trunkColor: dark ? '#302c43' : '#704650',
+      branchColor: dark ? '#44354b' : '#925766',
+      canopyColors: dark
+        ? ['#8f4778', '#bd5a91', '#e483ad', '#f3b1ca']
+        : ['#d44c82', '#f06f9b', '#ff8da1', '#ffb7c5'],
+      treeCount: TREE_COUNT_PER_LAYER * 2,
+      parallaxFactor: 0.8,
+      offsetY: 0,
+    },
+    {
+      trunkColor: dark ? '#373044' : '#83505b',
+      branchColor: dark ? '#5a4566' : '#a0657a',
+      canopyColors: dark
+        ? ['#bd5a91', '#e483ad', '#f3b1ca', '#d44c82']
+        : ['#f06f9b', '#ff8da1', '#ffb7c5', '#d44c82'],
+      treeCount: TREE_COUNT_PER_LAYER,
+      parallaxFactor: 0.5,
+      offsetY: height * 0.15,
+    },
+    {
+      trunkColor: dark ? '#403149' : '#694451',
+      branchColor: dark ? '#6b5b7a' : '#8a6c84',
+      canopyColors: dark
+        ? ['#e483ad', '#f3b1ca', '#d44c82', '#f06f9b']
+        : ['#ff8da1', '#ffb7c5', '#d44c82', '#f06f9b'],
+      treeCount: TREE_COUNT_PER_LAYER,
+      parallaxFactor: 0.3,
+      offsetY: height * 0.35,
+    },
+  ];
+
+  const allEndpoints = [];
+
+  layerConfigs.forEach((layer, li) => {
+    for (let ti = 0; ti < layer.treeCount; ti++) {
+      const treeIndex = ti % 3;
+      const x = (ti * 100 + time * layer.parallaxFactor) % width;
+      const baseY = height + layer.offsetY + Math.random() * height * 0.3;
+
+      ctx.save();
+      ctx.scale(0.6 - li * 0.15, 0.6 - li * 0.15);
+      ctx.fillStyle = layer.trunkColor;
+      ctx.fillRect(
+        (x - trunkBlock) / (0.6 - li * 0.15),
+        (baseY + 80) / (0.6 - li * 0.15),
+        trunkBlock * 3 / (0.6 - li * 0.15),
+        80 / (0.6 - li * 0.15)
+      );
+
+      const canopyColors = layer.canopyColors;
+      for (let ci = 0; ci < 8; ci++) {
+        const column = (ci - 3.5) * 1.5;
+        const row = (ci % 2 === 0 ? -(ci + 1) / 2 : (ci + 1) / 2);
+        const clusterX = x / (0.6 - li * 0.15) + column;
+        const clusterY = (baseY + 40) / (0.6 - li * 0.15) + row;
+        const colorIndex = (ci + Math.floor(time / 1200) + treeIndex) % canopyColors.length;
+        ctx.fillStyle = canopyColors[colorIndex];
+        ctx.beginPath();
+        ctx.arc(clusterX, clusterY, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      allEndpoints.push({ x, baseY });
+    }
   });
+
+  return allEndpoints;
 }
 
-function drawSun(ctx, width, height, block) {
+function drawCelestialBodies(ctx, width, height, theme, celestialTime) {
+  const dark = theme === 'dark';
+  const sunColor = dark ? '#f6ad55' : '#f6ad55';
+  const moonColor = dark ? '#faf0e6' : '#2d3748';
+
+  // Sun
+  const sunRadius = Math.min(width, height) * 0.12;
+  const sunAngle = (celestialTime / 10000) % (Math.PI * 2);
+  const sunX = width * 0.82 + Math.cos(sunAngle) * width * 0.18;
+  const sunY = height * 0.18 + Math.sin(sunAngle) * height * 0.15;
+
+  ctx.fillStyle = sunColor;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Moon
+  const moonRadius = Math.min(width, height) * 0.08;
+  const moonAngle = (celestialTime / 8000) % (Math.PI * 2) + Math.PI;
+  const moonX = width * 0.18 + Math.cos(moonAngle) * width * 0.35;
+  const moonY = height * 0.82 + Math.sin(moonAngle) * height * 0.18;
+
+  ctx.fillStyle = moonColor;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw stars
+  const starCount = Math.min(20, STAR_COUNT);
+  for (let si = 0; si < starCount; si++) {
+    const starX = (si * 31 + time * 0.0001) % width;
+    const starY = (Math.sin(si * 0.00005 + time) * 0.3 + 0.4) * height;
+    const starSize = Math.random() > 0.8 ? 2 : 1;
+    ctx.fillStyle = '#f8fafc';
+    ctx.globalAlpha = Math.random() > 0.5 ? 0.6 : 1.0;
+    ctx.beginPath();
+    ctx.arc(starX, starY, starSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1.0;
+}
+
+function drawClouds(ctx, width, height, theme, time) {
+  const cloudCount = Math.min(CLOUD_COUNT, 4);
+  for (let ci = 0; ci < cloudCount; ci++) {
+    const cloudX = (time * 0.00003 + ci * 50) % width - 50;
+    const cloudY = height * 0.25 + Math.sin(time * 0.0001 + ci) * 20;
+    ctx.fillStyle = dark ? '#2d3748' : '#f8fafc';
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(cloudX, cloudY, 15, 0, Math.PI * 2);
+    ctx.arc(cloudX + 20, cloudY, 10, 0, Math.PI * 2);
+    ctx.arc(cloudX - 20, cloudY, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1.0;
+}
+
+function drawLandscape(ctx, width, height, theme, time, stars, clouds) {
+  // ... (rest of landscape drawing will be added later)
+}
   const x = width * 0.83;
   const y = height * 0.17;
   const size = block * 5;
@@ -240,8 +388,6 @@ export function PixelArtBackground() {
     let width = 0;
     let height = 0;
     let petals = [];
-    const stars = createStars();
-    const clouds = createClouds();
     let lastFrame = 0;
     let frameId = null;
     let targetTheme = root.getAttribute('data-theme') || 'dark';
@@ -273,16 +419,34 @@ export function PixelArtBackground() {
       const progress = transitionStart
         ? Math.min((timestamp - transitionStart) / THEME_TRANSITION_MS, 1)
         : 1;
-      drawLandscape(ctx, width, height, previousTheme, timestamp, stars, clouds);
-      if (progress < 1) {
-        ctx.save();
-        ctx.globalAlpha = progress;
-        drawLandscape(ctx, width, height, targetTheme, timestamp, stars, clouds);
-        ctx.restore();
-      } else {
-        previousTheme = targetTheme;
-        transitionStart = 0;
-      }
+
+// Render forest layers with parallax
+const forestEndpoints = renderForestLayers(ctx, width, height, previousTheme, timestamp);
+
+// Draw celestial bodies (sun, moon, stars, clouds)
+drawCelestialBodies(ctx, width, height, previousTheme, timestamp);
+drawClouds(ctx, width, height, previousTheme, timestamp);
+
+// Draw horizon and ground
+const horizon = height * 0.57;
+ctx.fillStyle = previousTheme === 'dark' ? '#26364a' : '#94a3b8';
+for (let x = 0; x < width; x += 32) {
+  const peak = horizon - (Math.sin(x * 0.009) * 0.045 + 0.08) * height;
+  ctx.fillRect(x, peak, 32, height - peak);
+}
+
+// Draw rivers
+const riverTop = height * 0.68;
+ctx.fillStyle = previousTheme === 'dark' ? '#23485a' : '#7dd3fc';
+ctx.fillRect(0, riverTop, width, height - riverTop);
+ctx.fillStyle = previousTheme === 'dark' ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
+for (let row = 0; row < 9; row += 1) {
+  const y = riverTop + row * ((height - riverTop) / 9) + 32;
+  const offset = (timestamp * (0.018 + row * 0.002) + row * 32 * 3) % (32 * 12);
+  for (let x = -32 * 12 + offset; x < width; x += 32 * 12) {
+    ctx.fillRect(x, y, 32 * (2 + (row % 3)), Math.max(2, 32 / 3));
+  }
+}
 
       petals.forEach((petal) => {
         if (!reducedMotion) {
