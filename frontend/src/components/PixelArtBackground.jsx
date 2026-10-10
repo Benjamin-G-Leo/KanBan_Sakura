@@ -1,40 +1,197 @@
 import { useEffect, useRef, useState } from 'react';
 
 const PETAL_COUNT = 36;
-const PETAL_SIZE = 4;
+const STAR_COUNT = 72;
+const CLOUD_COUNT = 4;
+const THEME_TRANSITION_MS = 900;
 
 function createPetal(width, height, startInView = true) {
   return {
     x: Math.random() * width,
-    y: startInView ? Math.random() * height : -PETAL_SIZE,
+    y: startInView ? Math.random() * height : -5,
     drift: 0.45 + Math.random() * 0.65,
     fall: 0.35 + Math.random() * 0.55,
     sway: Math.random() * Math.PI * 2,
     swaySpeed: 0.012 + Math.random() * 0.012,
-    color: ['#f472b6', '#f9a8d4', '#fbcfe8', '#ec4899'][Math.floor(Math.random() * 4)],
     opacity: 0.55 + Math.random() * 0.35,
-    size: PETAL_SIZE + (Math.random() > 0.8 ? 1 : 0),
+    size: 4 + (Math.random() > 0.8 ? 1 : 0),
   };
 }
 
-function drawLandscape(ctx, width, height, theme, time) {
+function createStars() {
+  return Array.from({ length: STAR_COUNT }, () => ({
+    x: Math.random(),
+    y: Math.random() * 0.58,
+    size: Math.random() > 0.86 ? 3 : 2,
+    phase: Math.random() * Math.PI * 2,
+    speed: 0.0008 + Math.random() * 0.0018,
+  }));
+}
+
+function createClouds() {
+  return Array.from({ length: CLOUD_COUNT }, (_, index) => ({
+    x: index * 0.31 + Math.random() * 0.12,
+    y: 0.13 + Math.random() * 0.26,
+    scale: 0.75 + Math.random() * 0.65,
+    speed: 0.000008 + Math.random() * 0.00001,
+  }));
+}
+
+function drawPixelTree(ctx, height, block, x, baseY, scale, theme, time, treeIndex) {
+  const dark = theme === 'dark';
+  const unit = block * scale;
+  const trunkColor = dark ? ['#302c43', '#373044', '#403149'][treeIndex] : ['#704650', '#83505b', '#694451'][treeIndex];
+  const branchColor = dark ? '#44354b' : '#925766';
+  const canopyColors = dark
+    ? ['#8f4778', '#bd5a91', '#e483ad', '#f3b1ca']
+    : ['#d44c82', '#f06f9b', '#ff8da1', '#ffb7c5'];
+  const topY = baseY - height * scale * 0.55;
+
+  ctx.fillStyle = trunkColor;
+  ctx.fillRect(x - unit, topY + unit * 8, unit * 3, baseY - topY - unit * 8);
+  ctx.fillRect(x - unit * 3, baseY - unit * 5, unit * 7, unit * 5);
+
+  const branches = [
+    [[0, 11], [-1, 9], [-3, 8], [-5, 6], [-7, 5]],
+    [[0, 10], [1, 8], [3, 7], [5, 5], [7, 4]],
+    [[0, 7], [-1, 5], [-2, 3], [-4, 2], [-5, 0]],
+    [[1, 8], [2, 6], [4, 5], [5, 3], [7, 2]],
+    [[-1, 9], [-2, 7], [-4, 6], [-5, 4], [-7, 3]],
+  ];
+  const endpoints = [];
+
+  branches.forEach((branch, branchIndex) => {
+    const points = branch.map(([column, row]) => [x + column * unit, topY + row * unit]);
+    ctx.strokeStyle = branchIndex % 2 === 0 ? trunkColor : branchColor;
+    ctx.lineWidth = Math.max(unit * (branchIndex < 2 ? 2.4 : 1.8), 3);
+    ctx.lineCap = 'square';
+    ctx.beginPath();
+    ctx.moveTo(...points[0]);
+    points.slice(1).forEach(([pointX, pointY], index) => {
+      const previousPoint = points[index];
+      ctx.lineTo(previousPoint[0], pointY);
+      ctx.lineTo(pointX, pointY);
+    });
+    ctx.stroke();
+    endpoints.push(points[points.length - 1]);
+  });
+
+  const clusters = [
+    [-8, 4], [-7, 2], [-6, 6], [-5, 0], [-4, 3], [-3, 6], [-2, 1], [-1, -1],
+    [0, 2], [1, -2], [2, 1], [3, 4], [4, -1], [5, 2], [6, 0], [7, 3],
+    [-6, 8], [-3, 8], [1, 6], [4, 7],
+  ];
+
+  clusters.forEach(([column, row], index) => {
+    const clusterX = x + column * unit;
+    const clusterY = topY + row * unit;
+    const colorIndex = (index + Math.floor(time / 1800) + treeIndex) % canopyColors.length;
+    const size = unit * (index % 4 === 0 ? 3.4 : 2.6);
+    ctx.fillStyle = canopyColors[colorIndex];
+    ctx.fillRect(clusterX, clusterY, size, unit * 1.8);
+    ctx.fillRect(clusterX + unit * 0.7, clusterY - unit, size * 0.65, unit);
+    ctx.fillRect(clusterX + unit * 1.4, clusterY + unit * 1.8, size * 0.6, unit);
+  });
+
+  endpoints.forEach(([branchX, branchY], index) => {
+    ctx.fillStyle = canopyColors[(index + treeIndex) % canopyColors.length];
+    ctx.fillRect(branchX - unit * 1.4, branchY - unit * 1.5, unit * 3.2, unit * 2.5);
+  });
+}
+
+function drawSun(ctx, width, height, block) {
+  const x = width * 0.83;
+  const y = height * 0.17;
+  const size = block * 5;
+  ctx.save();
+  const alpha = ctx.globalAlpha;
+  ctx.globalAlpha = alpha * 0.22;
+  ctx.fillStyle = '#ffca77';
+  ctx.fillRect(x - size * 1.7, y - size * 1.7, size * 4.4, size * 4.4);
+  ctx.globalAlpha = alpha * 0.4;
+  ctx.fillRect(x - size * 1.15, y - size * 1.15, size * 3.3, size * 3.3);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#ffd166';
+  ctx.fillRect(x, y, size, size);
+  ctx.fillStyle = '#fff1b8';
+  ctx.fillRect(x + block, y + block, size - block * 2, size - block * 2);
+  ctx.fillStyle = 'rgba(255, 239, 177, 0.82)';
+  ctx.fillRect(x + size * 0.35, y - size * 0.8, size * 0.3, size * 0.5);
+  ctx.fillRect(x + size * 0.35, y + size * 1.3, size * 0.3, size * 0.5);
+  ctx.fillRect(x - size * 0.8, y + size * 0.35, size * 0.5, size * 0.3);
+  ctx.fillRect(x + size * 1.3, y + size * 0.35, size * 0.5, size * 0.3);
+  ctx.fillRect(x - size * 0.55, y - size * 0.55, size * 0.3, size * 0.3);
+  ctx.fillRect(x + size * 1.25, y - size * 0.55, size * 0.3, size * 0.3);
+  ctx.fillRect(x - size * 0.55, y + size * 1.25, size * 0.3, size * 0.3);
+  ctx.fillRect(x + size * 1.25, y + size * 1.25, size * 0.3, size * 0.3);
+  ctx.restore();
+}
+
+function drawMoon(ctx, width, height, block) {
+  const x = width * 0.82;
+  const y = height * 0.15;
+  const size = block * 5;
+  ctx.save();
+  ctx.shadowColor = 'rgba(190, 213, 255, 0.9)';
+  ctx.shadowBlur = size * 3;
+  ctx.fillStyle = 'rgba(189, 211, 255, 0.2)';
+  ctx.fillRect(x - size, y - size, size * 3, size * 3);
+  ctx.fillStyle = '#dbeafe';
+  ctx.fillRect(x, y, size, size);
+  ctx.fillStyle = '#f8f5e8';
+  ctx.fillRect(x + block, y + block, size - block * 2, size - block * 2);
+  ctx.fillStyle = '#111a2e';
+  ctx.fillRect(x + size * 0.52, y - block, size * 0.9, size * 0.9);
+  ctx.fillRect(x + size * 0.62, y + size * 0.2, size * 0.9, size * 0.9);
+  ctx.restore();
+}
+
+function drawCloud(ctx, cloud, width, height, block, time) {
+  const x = ((cloud.x + time * cloud.speed) % 1.2 - 0.1) * width;
+  const y = cloud.y * height;
+  const unit = block * cloud.scale;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
+  ctx.fillRect(x, y + unit * 2, unit * 10, unit * 2);
+  ctx.fillRect(x + unit * 2, y + unit, unit * 6, unit * 3);
+  ctx.fillRect(x + unit * 4, y, unit * 3, unit * 3);
+  ctx.fillStyle = 'rgba(203, 213, 225, 0.72)';
+  ctx.fillRect(x + unit, y + unit * 3, unit * 8, unit);
+}
+
+function drawLandscape(ctx, width, height, theme, time, stars, clouds) {
   const dark = theme === 'dark';
   const sky = ctx.createLinearGradient(0, 0, 0, height);
-  sky.addColorStop(0, dark ? '#10182a' : '#fce7f3');
-  sky.addColorStop(0.56, dark ? '#26334c' : '#fbcfe8');
+  sky.addColorStop(0, dark ? '#080f20' : '#7dd3fc');
+  sky.addColorStop(0.42, dark ? '#1c2942' : '#bfdbfe');
+  sky.addColorStop(0.72, dark ? '#38405a' : '#fce7f3');
   sky.addColorStop(1, dark ? '#172d42' : '#bfdbfe');
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height);
 
-  const block = Math.max(8, Math.round(width / 90));
-  const horizon = height * 0.54;
+  const block = Math.max(6, Math.round(width / 120));
+  if (dark) {
+    const sceneAlpha = ctx.globalAlpha;
+    stars.forEach((star) => {
+      const twinkle = 0.32 + (Math.sin(time * star.speed + star.phase) + 1) * 0.32;
+      ctx.globalAlpha = sceneAlpha * twinkle;
+      ctx.fillStyle = star.size > 2 ? '#d9e8ff' : '#ffffff';
+      ctx.fillRect(Math.round(star.x * width), Math.round(star.y * height), star.size, star.size);
+    });
+    ctx.globalAlpha = sceneAlpha;
+    drawMoon(ctx, width, height, block);
+  } else {
+    drawSun(ctx, width, height, block);
+    clouds.forEach((cloud) => drawCloud(ctx, cloud, width, height, block, time));
+  }
+
+  const horizon = height * 0.57;
   ctx.fillStyle = dark ? '#26364a' : '#94a3b8';
   for (let x = 0; x < width; x += block * 2) {
     const peak = horizon - (Math.sin(x * 0.009) * 0.045 + 0.08) * height;
     ctx.fillRect(x, peak, block * 3, height - peak);
   }
 
-  const riverTop = height * 0.63;
+  const riverTop = height * 0.68;
   ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
   ctx.fillRect(0, riverTop, width, height - riverTop);
   ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
@@ -46,70 +203,86 @@ function drawLandscape(ctx, width, height, theme, time) {
     }
   }
 
-  const treeX = width * 0.78;
-  const trunkTop = height * 0.19;
-  ctx.fillStyle = dark ? '#423246' : '#783f55';
-  ctx.fillRect(treeX, trunkTop + height * 0.16, block * 2, height * 0.35);
-  ctx.fillRect(treeX - block * 4, trunkTop + height * 0.38, block * 5, block * 2);
-  ctx.fillRect(treeX + block, trunkTop + height * 0.27, block * 5, block * 2);
-
-  const blossoms = dark
-    ? ['#9d4b78', '#c45b91', '#e883b2', '#f6b5cf']
-    : ['#be185d', '#db2777', '#ec4899', '#f9a8d4'];
-  const canopy = [
-    [-6, 2], [-5, 0], [-4, -2], [-3, 1], [-2, -3], [-1, -1], [0, -4],
-    [1, -2], [2, -4], [3, -2], [4, -1], [5, 1], [6, 3],
-    [-5, 3], [-4, 4], [-3, 2], [-2, 0], [-1, 2], [0, 0],
-    [1, 1], [2, -1], [3, 1], [4, 3], [5, 4], [-2, 4], [2, 3],
+  const trees = [
+    { x: width * 0.12, scale: 0.78 },
+    { x: width * 0.52, scale: 0.58 },
+    { x: width * 0.91, scale: 0.92 },
   ];
-  canopy.forEach(([column, row], index) => {
-    ctx.fillStyle = blossoms[(index + Math.floor(time / 1500)) % blossoms.length];
-    ctx.fillRect(treeX + column * block, trunkTop + row * block, block * 3, block * 2);
+  trees.forEach((tree, index) => {
+    drawPixelTree(ctx, height, block, tree.x, height * (0.72 + (index === 1 ? 0.01 : 0)), tree.scale, theme, time, index);
   });
 
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
   ctx.fillRect(0, riverTop - block, width, block * 2);
 }
 
+function mixColor(from, to, progress) {
+  const parse = (color) => color.match(/\w\w/g).map((part) => Number.parseInt(part, 16));
+  const fromRgb = parse(from.slice(1));
+  const toRgb = parse(to.slice(1));
+  const channels = fromRgb.map((channel, index) => Math.round(channel + (toRgb[index] - channel) * progress));
+  return `rgb(${channels.join(',')})`;
+}
+
 export function PixelArtBackground() {
   const canvasRef = useRef(null);
-  const frameRef = useRef(null);
-  const [theme, setTheme] = useState(
-    () => document.documentElement.getAttribute('data-theme') || 'dark',
-  );
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
 
   useEffect(() => {
     const root = document.documentElement;
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const updateTheme = () => setTheme(root.getAttribute('data-theme') || 'dark');
-    const updateMotion = (event) => setReducedMotion(event.matches);
-
-    root.addEventListener('themechange', updateTheme);
-    mediaQuery.addEventListener('change', updateMotion);
-    return () => {
-      root.removeEventListener('themechange', updateTheme);
-      mediaQuery.removeEventListener('change', updateMotion);
-    };
-  }, []);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return undefined;
 
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let width = 0;
     let height = 0;
     let petals = [];
+    const stars = createStars();
+    const clouds = createClouds();
     let lastFrame = 0;
+    let frameId = null;
+    let targetTheme = root.getAttribute('data-theme') || 'dark';
+    let previousTheme = targetTheme;
+    let transitionStart = 0;
+
+    const updateTheme = () => {
+      const nextTheme = root.getAttribute('data-theme') || 'dark';
+      if (nextTheme === targetTheme) return;
+      previousTheme = targetTheme;
+      targetTheme = nextTheme;
+      transitionStart = reducedMotion ? 0 : performance.now();
+      if (reducedMotion) {
+        previousTheme = targetTheme;
+        render(performance.now());
+      }
+    };
+
+    const updateMotion = (event) => setReducedMotion(event.matches);
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    mediaQuery.addEventListener('change', updateMotion);
 
     const render = (timestamp = 0) => {
       const elapsed = lastFrame ? Math.min(timestamp - lastFrame, 40) : 16;
       lastFrame = timestamp;
       ctx.clearRect(0, 0, width, height);
-      drawLandscape(ctx, width, height, theme, timestamp);
+
+      const progress = transitionStart
+        ? Math.min((timestamp - transitionStart) / THEME_TRANSITION_MS, 1)
+        : 1;
+      drawLandscape(ctx, width, height, previousTheme, timestamp, stars, clouds);
+      if (progress < 1) {
+        ctx.save();
+        ctx.globalAlpha = progress;
+        drawLandscape(ctx, width, height, targetTheme, timestamp, stars, clouds);
+        ctx.restore();
+      } else {
+        previousTheme = targetTheme;
+        transitionStart = 0;
+      }
 
       petals.forEach((petal) => {
         if (!reducedMotion) {
@@ -123,13 +296,21 @@ export function PixelArtBackground() {
           }
         }
 
+        const lightColor = petal.size > 4 ? '#ff8da1' : '#ffb7c5';
+        const darkColor = petal.size > 4 ? '#ff4fa3' : '#f472b6';
+        const colorForTheme = (value) => value === 'dark' ? darkColor : lightColor;
+        ctx.save();
         ctx.globalAlpha = petal.opacity;
-        ctx.fillStyle = petal.color;
+        ctx.fillStyle = mixColor(colorForTheme(previousTheme), colorForTheme(targetTheme), progress);
+        if (targetTheme === 'dark' || previousTheme === 'dark') {
+          ctx.shadowColor = '#ff4fa3';
+          ctx.shadowBlur = 7 * (targetTheme === 'dark' ? progress : 1 - progress);
+        }
         ctx.fillRect(Math.round(petal.x), Math.round(petal.y), petal.size, petal.size);
+        ctx.restore();
       });
-      ctx.globalAlpha = 1;
 
-      if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
+      if (!reducedMotion) frameId = requestAnimationFrame(render);
     };
 
     const resize = () => {
@@ -142,17 +323,19 @@ export function PixelArtBackground() {
       ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       petals = Array.from({ length: PETAL_COUNT }, () => createPetal(width, height));
       lastFrame = 0;
-      if (reducedMotion) render();
+      if (reducedMotion) render(performance.now());
     };
 
     resize();
-    if (!reducedMotion) frameRef.current = requestAnimationFrame(render);
+    if (!reducedMotion) frameId = requestAnimationFrame(render);
     window.addEventListener('resize', resize);
     return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', updateMotion);
       window.removeEventListener('resize', resize);
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (frameId !== null) cancelAnimationFrame(frameId);
     };
-  }, [reducedMotion, theme]);
+  }, [reducedMotion]);
 
   return (
     <div className="pixel-art-bg" aria-hidden="true">
