@@ -3,6 +3,8 @@ import { API_URL, COLUMNS } from '../components/constants';
 import { getTaskBreakdown, getWorkflowSuggestions, createTaskFromAI } from '../services/aiService';
 import { KanbanContext } from './KanbanContextValue';
 
+const AI_MODE_STORAGE_KEY = 'kanban_ai_mode_active';
+
 const initialState = {
   tasks: [],
   loading: true,
@@ -26,7 +28,7 @@ function getStoredApiKey() {
 
 function getStoredAiMode() {
   try {
-    return localStorage.getItem('kanban_ai_mode_enabled') === 'true';
+    return localStorage.getItem(AI_MODE_STORAGE_KEY) === 'true';
   } catch (e) {
     return false;
   }
@@ -168,7 +170,7 @@ export function KanbanProvider({ children }) {
 
   const setAiModeEnabled = useCallback((enabled) => {
     const nextEnabled = Boolean(enabled);
-    localStorage.setItem('kanban_ai_mode_enabled', String(nextEnabled));
+    localStorage.setItem(AI_MODE_STORAGE_KEY, String(nextEnabled));
     dispatch({
       type: 'SET_AI_MODE_ENABLED',
       payload: nextEnabled,
