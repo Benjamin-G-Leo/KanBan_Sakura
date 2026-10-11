@@ -50,7 +50,7 @@ function createClouds() {
 function drawOrganicStroke(ctx, points, color, width) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
-  ctx.lineCap = 'square';
+  ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
   ctx.moveTo(points[0][0], points[0][1]);
@@ -61,6 +61,17 @@ function drawOrganicStroke(ctx, points, color, width) {
   }
   ctx.lineTo(...points[points.length - 1]);
   ctx.stroke();
+}
+
+function drawTaperedOrganicStroke(ctx, points, color, startWidth, endWidth) {
+  for (let index = 1; index < points.length; index += 1) {
+    const progress = index / (points.length - 1);
+    const width = startWidth + (endWidth - startWidth) * progress;
+    const segment = index === 1
+      ? points.slice(0, 2)
+      : [points[index - 2], points[index - 1], points[index]];
+    drawOrganicStroke(ctx, segment, color, width);
+  }
 }
 
 function drawBezierStroke(ctx, start, controls, end, color, width) {
@@ -81,7 +92,7 @@ function drawBezierStroke(ctx, start, controls, end, color, width) {
   ctx.stroke();
 }
 
-function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
+function drawCanopy(ctx, centerX, centerY, unit, colors, seed, layer = 'all') {
   const cloudWidth = 13;
   const cloudHeight = 9;
   const cell = Math.max(1, unit * 0.62);
@@ -99,6 +110,7 @@ function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
         : normalizedY < 0.28
           ? 2
           : 1;
+      if ((layer === 'inner' && tone === 2) || (layer === 'highlight' && tone !== 2)) continue;
       ctx.fillStyle = [shadow, middle, highlight][tone];
       ctx.fillRect(
         Math.round(centerX + column * cell),
@@ -117,7 +129,7 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
   const bankY = height * 0.68;
   const topY = bankY - height * 0.45 * tree.scale;
   const trunk = dark ? '#302638' : '#56353c';
-  const outline = dark ? '#171522' : '#38252b';
+  const outline = dark ? '#241821' : '#47252c';
   const woodLight = dark ? '#705362' : '#a36a68';
   const colors = [dark ? '#702d5d' : '#8f285b', '#ff8da1', '#ffb7c5'];
   const baseWidth = unit * (tree.depth === 'back' ? 7 : 10);
@@ -137,17 +149,18 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
   ctx.fillRect(centerX - baseWidth * 0.9, bankY - unit, baseWidth * 1.8, unit * 3);
 
   const primaryBranches = [
-    { direction: -1, reach: 26, lift: 13, bend: -2 },
-    { direction: 1, reach: 25, lift: 15, bend: 2 },
-    { direction: -1, reach: 19, lift: 21, bend: 3 },
-    { direction: 1, reach: 20, lift: 20, bend: -3 },
+    { direction: -1, reach: 26, lift: 13, bend: -2, offset: -1 },
+    { direction: 1, reach: 25, lift: 15, bend: 2, offset: 1 },
+    { direction: -1, reach: 19, lift: 21, bend: 3, offset: -2 },
+    { direction: 1, reach: 20, lift: 20, bend: -3, offset: 2 },
   ];
-  const skeleton = [];
+  const primaryLimbs = [];
+  const accentTwigs = [];
   const canopyAnchors = [];
 
   primaryBranches.forEach((branch, branchIndex) => {
     const start = [
-      trunkTop[0] + branch.direction * unit * (branchIndex % 2 ? 1 : -1),
+      trunkTop[0] + branch.offset * unit,
       trunkTop[1] - unit * (branchIndex + 1) * 0.8,
     ];
     const points = [
@@ -156,12 +169,12 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
       [start[0] + branch.direction * unit * (branch.reach * 0.55), start[1] - unit * (branch.lift * 0.48)],
       [start[0] + branch.direction * unit * (branch.reach + branch.bend), start[1] - unit * branch.lift],
     ];
-    skeleton.push({ points, width: unit * (branchIndex < 2 ? 3.1 : 2.5) });
+    primaryLimbs.push(points);
     canopyAnchors.push(...points);
 
     for (let twigIndex = 1; twigIndex < points.length; twigIndex += 1) {
       const [x, y] = points[twigIndex];
-      [-1, 1].forEach((side) => {
+      [-1, 1].forEach((side, sideIndex) => {
         const direction = branch.direction * side;
         const twig = [
           [x, y],
@@ -169,37 +182,19 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
           [x + direction * unit * 5.5, y - unit * (4.6 + twigIndex * 0.45)],
           [x + direction * unit * (7 + twigIndex), y - unit * (6 + twigIndex * 0.55)],
         ];
-        skeleton.push({ points: twig, width: unit * 1.05 });
         canopyAnchors.push(...twig.slice(1));
+        if ((twigIndex + sideIndex + branchIndex) % 2 === 0) accentTwigs.push(twig);
       });
     }
   });
 
-  // Fill the fork and branch corridors first so no gaps remain around the trunk.
-  for (let row = -7; row <= 11; row += 2) {
-    for (let column = -18; column <= 18; column += 3) {
-      const x = trunkTop[0] + column * unit;
-      const y = topY + unit * (row + 10);
-      drawCanopy(ctx, x, y, unit * 0.9, colors, index * 41 + row * 7 + column);
-    }
-  }
-
-  // Four times the former branch-tip coverage: every primary and secondary fork
-  // receives overlapping shadow, core, and highlight cloud layers.
-  canopyAnchors.forEach(([x, y], anchorIndex) => {
-    const seed = index * 97 + anchorIndex * 13 + Math.floor(time / 5000);
-    drawCanopy(ctx, x, y + unit * 0.5, unit * 1.45, colors, seed);
-    drawCanopy(ctx, x + unit * 1.2, y - unit * 1.2, unit * 1.2, colors, seed + 1);
-    drawCanopy(ctx, x - unit * 1.1, y + unit * 1.1, unit * 1.15, colors, seed + 2);
-    drawCanopy(ctx, x + unit * 0.3, y - unit * 2.4, unit * 0.9, colors, seed + 3);
+  // Layer 1: paint the wood beneath the canopy, with a visibly tapered silhouette.
+  primaryLimbs.forEach((points, branchIndex) => {
+    const startWidth = unit * (branchIndex < 2 ? 3.5 : 2.9);
+    drawTaperedOrganicStroke(ctx, points, outline, startWidth + unit, unit * 1.3);
+    drawTaperedOrganicStroke(ctx, points, trunk, startWidth, unit * 0.8);
+    drawTaperedOrganicStroke(ctx, points, woodLight, unit * 0.7, Math.max(1, unit * 0.25));
   });
-
-  skeleton.forEach(({ points, width: branchWidth }) => {
-    drawOrganicStroke(ctx, points, outline, branchWidth + unit * 1.4);
-    drawOrganicStroke(ctx, points, trunk, branchWidth);
-    drawOrganicStroke(ctx, points, woodLight, Math.max(1, unit * 0.42));
-  });
-
   const roots = [
     [[centerX, bankY], [centerX - unit * 7, bankY + unit], [centerX - unit * 14, bankY + unit * 2]],
     [[centerX, bankY], [centerX + unit * 6, bankY + unit], [centerX + unit * 13, bankY + unit * 2]],
@@ -208,6 +203,34 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
     drawOrganicStroke(ctx, root, outline, unit * 2.4);
     drawOrganicStroke(ctx, root, trunk, unit * 1.5);
   });
+
+  // Layer 2: build one continuous, overlapping inner canopy over every branch joint.
+  for (let row = -8; row <= 12; row += 2) {
+    for (let column = -19; column <= 19; column += 3) {
+      const x = trunkTop[0] + column * unit;
+      const y = topY + unit * (row + 10);
+      drawCanopy(ctx, x, y, unit * 1.12, colors, index * 41 + row * 7 + column, 'inner');
+    }
+  }
+  canopyAnchors.forEach(([x, y], anchorIndex) => {
+    const seed = index * 97 + anchorIndex * 13 + Math.floor(time / 5000);
+    drawCanopy(ctx, x, y + unit * 0.5, unit * 1.7, colors, seed, 'inner');
+    drawCanopy(ctx, x + unit * 1.5, y - unit * 1.3, unit * 1.45, colors, seed + 1, 'inner');
+    drawCanopy(ctx, x - unit * 1.4, y + unit * 1.2, unit * 1.35, colors, seed + 2, 'inner');
+  });
+
+  // Layer 3: let only a few thin, warm twigs peek through around the edges.
+  accentTwigs.forEach((points) => {
+    drawOrganicStroke(ctx, points, outline, Math.max(1, unit * 0.55));
+    drawOrganicStroke(ctx, points, woodLight, Math.max(1, unit * 0.26));
+  });
+
+  // Layer 4: cap the upper cloud edges with compact pastel highlights.
+  canopyAnchors.forEach(([x, y], anchorIndex) => {
+    const seed = index * 131 + anchorIndex * 17;
+    drawCanopy(ctx, x + unit * 0.35, y - unit * 2.1, unit * 1.05, colors, seed, 'highlight');
+  });
+
   ctx.restore();
 }
 
