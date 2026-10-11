@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PixelArtBackground } from './components/PixelArtBackground';
 import { SettingsModal } from './components/SettingsModal';
@@ -68,9 +68,19 @@ function AppContent() {
     setAiModeEnabled,
   } = useKanban();
 
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('theme') || 'dark';
+    } catch (error) {
+      return 'dark';
+    }
+  });
+
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    document.documentElement.dispatchEvent(new CustomEvent('themechange'));
+  }, [theme]);
 
   const isKeyConnected = Boolean(apiKey);
 
@@ -78,18 +88,44 @@ function AppContent() {
     setAiModeEnabled(event.target.checked);
   };
 
+  const toggleTheme = () => {
+    setTheme((currentTheme) => currentTheme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <div className="app-wrapper min-h-screen bg-slate-950 text-white">
       <PixelArtBackground />
 
       <header className="relative z-10 border-b border-white/10 bg-slate-950/50 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.24em] text-emerald-300/80">AI Kanban</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Project Board</h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={toggleSettingsModal}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+              aria-label="Open OpenRouter API key settings"
+              title="Open OpenRouter API key settings"
+            >
+              <span className={`h-2.5 w-2.5 rounded-full ${isKeyConnected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
+              {isKeyConnected ? 'Update Key' : 'Set API Key'}
+            </button>
+
+            {isAiModeEnabled && (
+              <button
+                type="button"
+                onClick={toggleSuggestions}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
+                aria-label={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
+              >
+                {suggestionsOpen ? 'Close Insights' : 'Open Insights'}
+              </button>
+            )}
+
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
               <span>AI Mode</span>
               <input
@@ -104,28 +140,30 @@ function AppContent() {
               </span>
             </label>
 
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
-              <span className={`h-2.5 w-2.5 rounded-full ${isKeyConnected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
-              {isKeyConnected ? 'Key Connected' : 'Set API Key'}
-            </div>
-
-            {isAiModeEnabled && (
-              <button
-                type="button"
-                onClick={toggleSuggestions}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
-                aria-label={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
-              >
-                {suggestionsOpen ? 'Close Insights' : 'Open Insights'}
-              </button>
-            )}
-
             <button
               type="button"
-              onClick={toggleSettingsModal}
-              className="rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/20"
+              onClick={toggleTheme}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
-              {isKeyConnected ? 'Update Key' : 'Set API Key'}
+              {theme === 'dark' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
