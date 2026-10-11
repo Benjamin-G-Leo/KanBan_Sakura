@@ -82,31 +82,32 @@ function drawBezierStroke(ctx, start, controls, end, color, width) {
 }
 
 function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
-  const bumps = [
-    [-10, 0, 4], [-9, -3, 4], [-7, -5, 4], [-5, -2, 5], [-4, -6, 4],
-    [-2, -4, 5], [0, -7, 4], [2, -5, 5], [4, -7, 4], [6, -4, 5],
-    [8, -3, 4], [10, 0, 4], [9, 3, 5], [7, 6, 4], [5, 4, 5],
-    [3, 7, 4], [0, 6, 5], [-2, 8, 4], [-5, 6, 5], [-7, 4, 4],
-    [-10, 2, 3], [-4, 1, 5], [1, 1, 5], [6, 1, 5],
-  ];
-  const cell = unit * 0.72;
+  const cloudWidth = 13;
+  const cloudHeight = 9;
+  const cell = Math.max(1, unit * 0.62);
+  const [shadow, middle, highlight] = colors;
 
-  bumps.forEach(([column, row, radius], bumpIndex) => {
-    for (let dy = -radius; dy <= radius; dy += 1) {
-      for (let dx = -radius; dx <= radius; dx += 1) {
-        const wobble = ((dx * 7 + dy * 11 + bumpIndex * 5 + seed) % 5) * 0.08;
-        if (dx * dx + dy * dy > radius * radius * (0.7 + wobble)) continue;
-        const tone = Math.abs(dx * 3 + dy * 5 + seed + bumpIndex) % colors.length;
-        ctx.fillStyle = colors[tone];
-        ctx.fillRect(
-          centerX + (column + dx) * cell,
-          centerY + (row + dy) * cell,
-          cell,
-          cell,
-        );
-      }
+  for (let row = -cloudHeight; row <= cloudHeight; row += 1) {
+    for (let column = -cloudWidth; column <= cloudWidth; column += 1) {
+      const edge = (column / cloudWidth) ** 2 + (row / cloudHeight) ** 2;
+      const wobble = Math.sin((column * 17 + row * 11 + seed) * 0.7) * 0.08;
+      if (edge > 1.08 + wobble) continue;
+
+      const normalizedY = (row + cloudHeight) / (cloudHeight * 2);
+      const tone = normalizedY > 0.63
+        ? 0
+        : normalizedY < 0.28
+          ? 2
+          : 1;
+      ctx.fillStyle = [shadow, middle, highlight][tone];
+      ctx.fillRect(
+        Math.round(centerX + column * cell),
+        Math.round(centerY + row * cell),
+        Math.ceil(cell + 0.6),
+        Math.ceil(cell + 0.6),
+      );
     }
-  });
+  }
 }
 
 function drawTree(ctx, width, height, tree, theme, time, index) {
@@ -118,7 +119,7 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
   const trunk = dark ? '#302638' : '#56353c';
   const outline = dark ? '#171522' : '#38252b';
   const woodLight = dark ? '#705362' : '#a36a68';
-  const colors = dark ? DARK_BLOSSOMS : LIGHT_BLOSSOMS;
+  const colors = [dark ? '#702d5d' : '#8f285b', '#ff8da1', '#ffb7c5'];
   const baseWidth = unit * (tree.depth === 'back' ? 7 : 10);
   const trunkTop = [centerX + tree.bend * unit * 4, topY + unit * 12];
   const trunkControls = [
@@ -135,43 +136,68 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
   ctx.fillStyle = outline;
   ctx.fillRect(centerX - baseWidth * 0.9, bankY - unit, baseWidth * 1.8, unit * 3);
 
-  const limbs = [
-    {
-      controls: [
-        [trunkTop[0] - unit * 2, trunkTop[1] - unit * 4],
-        [centerX - unit * 13, topY + height * 0.08],
-      ],
-      end: [centerX - unit * 22, topY + unit * 6],
-      size: 1.3,
-    },
-    {
-      controls: [
-        [trunkTop[0] + unit * 2, trunkTop[1] - unit * 5],
-        [centerX + unit * 4, topY - unit * 2],
-      ],
-      end: [centerX + unit * 7, topY - unit * 12],
-      size: 1.45,
-    },
-    {
-      controls: [
-        [trunkTop[0] + unit * 3, trunkTop[1] - unit * 2],
-        [centerX + unit * 16, topY + height * 0.13],
-      ],
-      end: [centerX + unit * 25, topY + unit * 4],
-      size: 1.2,
-    },
+  const primaryBranches = [
+    { direction: -1, reach: 26, lift: 13, bend: -2 },
+    { direction: 1, reach: 25, lift: 15, bend: 2 },
+    { direction: -1, reach: 19, lift: 21, bend: 3 },
+    { direction: 1, reach: 20, lift: 20, bend: -3 },
   ];
+  const skeleton = [];
+  const canopyAnchors = [];
 
-  limbs.forEach((limb, limbIndex) => {
-    const branchWidth = unit * limb.size;
-    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, outline, branchWidth + unit * 2);
-    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, trunk, branchWidth);
-    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, woodLight, Math.max(2, unit * 0.55));
+  primaryBranches.forEach((branch, branchIndex) => {
+    const start = [
+      trunkTop[0] + branch.direction * unit * (branchIndex % 2 ? 1 : -1),
+      trunkTop[1] - unit * (branchIndex + 1) * 0.8,
+    ];
+    const points = [
+      start,
+      [start[0] + branch.direction * unit * 5, start[1] - unit * 2],
+      [start[0] + branch.direction * unit * (branch.reach * 0.55), start[1] - unit * (branch.lift * 0.48)],
+      [start[0] + branch.direction * unit * (branch.reach + branch.bend), start[1] - unit * branch.lift],
+    ];
+    skeleton.push({ points, width: unit * (branchIndex < 2 ? 3.1 : 2.5) });
+    canopyAnchors.push(...points);
 
-    const seed = index * 31 + limbIndex * 17 + Math.floor(time / 5000);
-    drawCanopy(ctx, limb.end[0] + unit, limb.end[1], unit * (2.3 - limbIndex * 0.18), [colors[0], colors[0], colors[1]], seed);
-    drawCanopy(ctx, limb.end[0], limb.end[1] - unit * 2, unit * 1.55, [colors[1], colors[2], colors[1]], seed + 2);
-    drawCanopy(ctx, limb.end[0] - unit * 2, limb.end[1] + unit, unit * 0.9, [colors[2], colors[3], colors[2]], seed + 4);
+    for (let twigIndex = 1; twigIndex < points.length; twigIndex += 1) {
+      const [x, y] = points[twigIndex];
+      [-1, 1].forEach((side) => {
+        const direction = branch.direction * side;
+        const twig = [
+          [x, y],
+          [x + direction * unit * 3, y - unit * (2.2 + twigIndex * 0.35)],
+          [x + direction * unit * 5.5, y - unit * (4.6 + twigIndex * 0.45)],
+          [x + direction * unit * (7 + twigIndex), y - unit * (6 + twigIndex * 0.55)],
+        ];
+        skeleton.push({ points: twig, width: unit * 1.05 });
+        canopyAnchors.push(...twig.slice(1));
+      });
+    }
+  });
+
+  // Fill the fork and branch corridors first so no gaps remain around the trunk.
+  for (let row = -7; row <= 11; row += 2) {
+    for (let column = -18; column <= 18; column += 3) {
+      const x = trunkTop[0] + column * unit;
+      const y = topY + unit * (row + 10);
+      drawCanopy(ctx, x, y, unit * 0.9, colors, index * 41 + row * 7 + column);
+    }
+  }
+
+  // Four times the former branch-tip coverage: every primary and secondary fork
+  // receives overlapping shadow, core, and highlight cloud layers.
+  canopyAnchors.forEach(([x, y], anchorIndex) => {
+    const seed = index * 97 + anchorIndex * 13 + Math.floor(time / 5000);
+    drawCanopy(ctx, x, y + unit * 0.5, unit * 1.45, colors, seed);
+    drawCanopy(ctx, x + unit * 1.2, y - unit * 1.2, unit * 1.2, colors, seed + 1);
+    drawCanopy(ctx, x - unit * 1.1, y + unit * 1.1, unit * 1.15, colors, seed + 2);
+    drawCanopy(ctx, x + unit * 0.3, y - unit * 2.4, unit * 0.9, colors, seed + 3);
+  });
+
+  skeleton.forEach(({ points, width: branchWidth }) => {
+    drawOrganicStroke(ctx, points, outline, branchWidth + unit * 1.4);
+    drawOrganicStroke(ctx, points, trunk, branchWidth);
+    drawOrganicStroke(ctx, points, woodLight, Math.max(1, unit * 0.42));
   });
 
   const roots = [
