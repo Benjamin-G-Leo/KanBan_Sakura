@@ -4,9 +4,16 @@ const PETAL_COUNT = 48;
 const STAR_COUNT = 96;
 const CLOUD_COUNT = 6;
 const THEME_TRANSITION_MS = 900;
-
-const LIGHT_BLOSSOMS = ['#d44c82', '#f06f9b', '#ff8da1', '#ffb7c5'];
-const DARK_BLOSSOMS = ['#8f4778', '#bd5a91', '#e483ad', '#f3b1ca'];
+const CELESTIAL_CYCLE_MS = 180_000;
+const PIXEL = 3;
+const LIGHT_BLOSSOMS = ['#b52f64', '#ec5f87', '#ff8da1', '#ffb7c5'];
+const DARK_BLOSSOMS = ['#702d5d', '#a93f78', '#d85f93', '#f09db8'];
+const TREES = [
+  { x: 0.08, scale: 0.96, depth: 'back', bend: -0.24 },
+  { x: 0.34, scale: 1.08, depth: 'front', bend: 0.18 },
+  { x: 0.68, scale: 0.94, depth: 'back', bend: -0.16 },
+  { x: 0.94, scale: 1.15, depth: 'front', bend: 0.2 },
+];
 
 function createPetal(width, height, startInView = true) {
   return {
@@ -24,7 +31,7 @@ function createPetal(width, height, startInView = true) {
 function createStars() {
   return Array.from({ length: STAR_COUNT }, () => ({
     x: Math.random(),
-    y: Math.random() * 0.57,
+    y: Math.random() * 0.58,
     size: Math.random() > 0.84 ? 3 : 2,
     phase: Math.random() * Math.PI * 2,
     speed: 0.0008 + Math.random() * 0.0018,
@@ -40,103 +47,260 @@ function createClouds() {
   }));
 }
 
-function drawTree(ctx, width, height, block, tree, theme, time, index) {
+function drawOrganicStroke(ctx, points, color, width) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(points[0][0], points[0][1]);
+  for (let index = 1; index < points.length; index += 1) {
+    const [x, y] = points[index];
+    const [previousX, previousY] = points[index - 1];
+    ctx.quadraticCurveTo(previousX, previousY, (previousX + x) / 2, (previousY + y) / 2);
+  }
+  ctx.lineTo(...points[points.length - 1]);
+  ctx.stroke();
+}
+
+function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
+  const bumps = [
+    [-10, 0, 4], [-9, -3, 4], [-7, -5, 4], [-5, -2, 5], [-4, -6, 4],
+    [-2, -4, 5], [0, -7, 4], [2, -5, 5], [4, -7, 4], [6, -4, 5],
+    [8, -3, 4], [10, 0, 4], [9, 3, 5], [7, 6, 4], [5, 4, 5],
+    [3, 7, 4], [0, 6, 5], [-2, 8, 4], [-5, 6, 5], [-7, 4, 4],
+    [-10, 2, 3], [-4, 1, 5], [1, 1, 5], [6, 1, 5],
+  ];
+  const cell = unit * 0.72;
+
+  bumps.forEach(([column, row, radius], bumpIndex) => {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const wobble = ((dx * 7 + dy * 11 + bumpIndex * 5 + seed) % 5) * 0.08;
+        if (dx * dx + dy * dy > radius * radius * (0.7 + wobble)) continue;
+        const tone = Math.abs(dx * 3 + dy * 5 + seed + bumpIndex) % colors.length;
+        ctx.fillStyle = colors[tone];
+        ctx.fillRect(
+          centerX + (column + dx) * cell,
+          centerY + (row + dy) * cell,
+          cell,
+          cell,
+        );
+      }
+    }
+  });
+}
+
+function drawTree(ctx, width, height, tree, theme, time, index) {
   const dark = theme === 'dark';
-  const unit = block * tree.scale;
+  const unit = Math.max(2, PIXEL * tree.scale);
   const centerX = tree.x * width;
-  const baseY = height * tree.base;
-  const topY = baseY - height * tree.scale * 0.55;
-  const trunk = dark ? ['#302c43', '#373044', '#403149'][index] : ['#704650', '#83505b', '#694451'][index];
-  const branch = dark ? '#44354b' : '#925766';
-  const blossoms = dark ? DARK_BLOSSOMS : LIGHT_BLOSSOMS;
-
-  ctx.fillStyle = trunk;
-  ctx.fillRect(centerX - unit, topY + unit * 8, unit * 3, baseY - topY - unit * 8);
-  ctx.fillRect(centerX - unit * 3, baseY - unit * 5, unit * 7, unit * 5);
-
-  const branches = [
-    [[0, 11], [-1, 9], [-3, 8], [-5, 6], [-7, 5]],
-    [[0, 10], [1, 8], [3, 7], [5, 5], [7, 4]],
-    [[0, 7], [-1, 5], [-2, 3], [-4, 2], [-5, 0]],
-    [[1, 8], [2, 6], [4, 5], [5, 3], [7, 2]],
-    [[-1, 9], [-2, 7], [-4, 6], [-5, 4], [-7, 3]],
+  const bankY = height * 0.68;
+  const topY = bankY - height * 0.48 * tree.scale;
+  const trunk = dark ? '#302638' : '#56353c';
+  const outline = dark ? '#171522' : '#38252b';
+  const woodLight = dark ? '#705362' : '#a36a68';
+  const branchPaths = [
+    [[0, 12], [-1, 10], [-3, 8], [-4, 6], [-7, 4], [-9, 3]],
+    [[0, 11], [2, 9], [3, 7], [6, 5], [8, 3], [10, 2]],
+    [[-1, 8], [-2, 6], [-2, 4], [-4, 2], [-5, 0]],
+    [[1, 9], [1, 7], [3, 5], [3, 3], [5, 1]],
+    [[0, 12], [-2, 11], [-4, 10], [-6, 8], [-8, 7], [-11, 6]],
+    [[0, 11], [2, 11], [4, 10], [6, 8], [9, 7], [12, 5]],
+    [[-1, 9], [-3, 7], [-5, 6], [-7, 5], [-10, 4]],
+    [[1, 10], [3, 8], [5, 7], [7, 6], [10, 5], [12, 3]],
+  ];
+  const canopyAnchors = [
+    [-9, 3], [-7, 4], [-5, 0], [-4, 2], [-2, 4], [3, 3], [5, 1], [6, 5], [8, 3], [10, 2],
+    [-12, 5], [-11, 1], [-9, -2], [-7, 6], [-6, -4], [-3, -2], [-1, 6], [1, -4],
+    [2, 5], [4, -3], [7, -1], [9, 5], [11, 1], [12, 4], [0, -7],
+  ];
+  const trunkPath = [
+    [centerX, bankY],
+    [centerX + tree.bend * unit * 2, bankY - height * 0.15 * tree.scale],
+    [centerX - tree.bend * unit, bankY - height * 0.32 * tree.scale],
+    [centerX, topY + unit * 8],
   ];
 
-  branches.forEach((points, branchIndex) => {
-    ctx.fillStyle = branchIndex % 2 === 0 ? trunk : branch;
-    points.slice(1).forEach(([column, row], pointIndex) => {
-      const [previousColumn, previousRow] = points[pointIndex];
-      const x1 = centerX + previousColumn * unit;
-      const y1 = topY + previousRow * unit;
-      const x2 = centerX + column * unit;
-      const y2 = topY + row * unit;
-      const thickness = Math.max(unit * (branchIndex < 2 ? 2.2 : 1.6), 2);
-      ctx.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1) + thickness, Math.abs(y2 - y1) + thickness);
+  ctx.save();
+  ctx.globalAlpha *= tree.depth === 'back' ? 0.62 : 1;
+  const baseWidth = unit * (tree.depth === 'back' ? 7 : 10);
+  drawOrganicStroke(ctx, trunkPath, outline, baseWidth + unit * 2);
+  drawOrganicStroke(ctx, trunkPath, trunk, baseWidth);
+  drawOrganicStroke(ctx, trunkPath, woodLight, Math.max(2, unit));
+  ctx.fillStyle = outline;
+  ctx.fillRect(centerX - baseWidth * 0.8, bankY - unit * 2, baseWidth * 1.6, unit * 3);
+
+  const trunkGrain = [
+    [[-1, 0], [-2, -3], [-1, -6]],
+    [[2, -1], [3, -4], [1, -7]],
+    [[-3, -1], [-4, -3]],
+  ];
+  trunkGrain.forEach((path) => {
+    drawOrganicStroke(
+      ctx,
+      path.map(([dx, dy]) => [centerX + dx * unit, bankY + dy * unit * 3]),
+      outline,
+      Math.max(2, unit * 0.7),
+    );
+  });
+
+  const colors = dark ? DARK_BLOSSOMS : LIGHT_BLOSSOMS;
+  const midBranchLevels = [0.34, 0.5, 0.66];
+  midBranchLevels.forEach((level, levelIndex) => {
+    const y = bankY - (bankY - topY) * level;
+    const trunkOffset = tree.bend * unit * (1.2 - level);
+    const anchorX = centerX + trunkOffset;
+    [-1, 1].forEach((direction) => {
+      const reach = unit * (16 + levelIndex * 2.5);
+      const branchPoints = [
+        [anchorX, y],
+        [anchorX + direction * unit * 4, y - unit * 0.8],
+        [anchorX + direction * unit * 9, y - unit * 3.8],
+        [anchorX + direction * reach * 0.78, y - unit * 8],
+        [anchorX + direction * reach, y - unit * 12],
+      ];
+      const branchWidth = unit * (2.1 - levelIndex * 0.15);
+      const branchBase = branchPoints.slice(0, 3);
+      const twigDirection = direction;
+      const twigPoints = [
+        branchPoints[3],
+        [branchPoints[3][0] + twigDirection * unit * 3, branchPoints[3][1] - unit * 2.8],
+        [branchPoints[3][0] + twigDirection * unit * 5.2, branchPoints[3][1] - unit * 6],
+      ];
+
+      const clusterSize = unit * (levelIndex === 1 ? 1.7 : 1.45);
+      const clusterSeeds = levelIndex * 20 + (direction > 0 ? 7 : 0) + index * 31;
+      [
+        [branchPoints[3][0] + direction * unit * 2, branchPoints[3][1] - unit * 2, clusterSize * 0.85],
+        [branchPoints[4][0] + direction * unit * 2, branchPoints[4][1] - unit * 2, clusterSize],
+      ].forEach(([clusterX, clusterY, size], clusterIndex) => {
+        const seed = clusterSeeds + clusterIndex * 3;
+        drawCanopy(ctx, clusterX + unit, clusterY + unit, size, [colors[0], colors[0], colors[1]], seed);
+        drawCanopy(ctx, clusterX, clusterY, size * 0.72, [colors[1], colors[2], colors[1]], seed + 2);
+        drawCanopy(ctx, clusterX - unit, clusterY - unit, size * 0.42, [colors[2], colors[3], colors[2]], seed + 4);
+      });
+
+      drawOrganicStroke(ctx, branchBase, outline, branchWidth + unit * 2.2);
+      drawOrganicStroke(ctx, branchBase, trunk, branchWidth + unit * 1.2);
+      drawOrganicStroke(ctx, branchPoints, outline, branchWidth + unit);
+      drawOrganicStroke(ctx, branchPoints, trunk, branchWidth);
+      drawOrganicStroke(ctx, branchPoints, woodLight, Math.max(2, unit * 0.65));
+      drawOrganicStroke(ctx, twigPoints, outline, unit * 1.15 + 1);
+      drawOrganicStroke(ctx, twigPoints, trunk, unit * 1.15);
+      drawOrganicStroke(ctx, twigPoints, woodLight, Math.max(1, unit * 0.35));
     });
   });
 
-  const clusters = [
-    [-8, 4], [-7, 2], [-6, 6], [-5, 0], [-4, 3], [-3, 6], [-2, 1], [-1, -1],
-    [0, 2], [1, -2], [2, 1], [3, 4], [4, -1], [5, 2], [6, 0], [7, 3],
-    [-6, 8], [-3, 8], [1, 6], [4, 7],
-  ];
+  branchPaths.forEach((branchPath, branchIndex) => {
+    const points = branchPath.map(([column, row]) => [
+      centerX + column * unit * 2.15,
+      topY + row * unit * 2.3,
+    ]);
+    const primaryWidth = unit * (branchIndex < 2 ? 3.2 : 2.4);
+    drawOrganicStroke(ctx, points, outline, primaryWidth + unit);
+    drawOrganicStroke(ctx, points, trunk, primaryWidth);
+    drawOrganicStroke(ctx, points, woodLight, Math.max(2, unit * 0.8));
 
-  clusters.forEach(([column, row], clusterIndex) => {
-    const x = centerX + column * unit;
-    const y = topY + row * unit;
-    const size = unit * (clusterIndex % 4 === 0 ? 3.4 : 2.6);
-    ctx.fillStyle = blossoms[(clusterIndex + Math.floor(time / 1800) + index) % blossoms.length];
-    ctx.fillRect(x, y, size, unit * 1.8);
-    ctx.fillRect(x + unit * 0.7, y - unit, size * 0.65, unit);
-    ctx.fillRect(x + unit * 1.4, y + unit * 1.8, size * 0.6, unit);
+    for (let segment = 1; segment < points.length; segment += 1) {
+      const [x, y] = points[segment];
+      const branchDirection = branchPath[branchPath.length - 1][0] >= branchPath[0][0] ? 1 : -1;
+      [-1, 1].forEach((side, forkIndex) => {
+        const direction = branchDirection * (forkIndex === 0 ? 1 : -0.55);
+        const twigs = [
+          [x, y],
+          [x + direction * unit * 1.8, y - unit * (side > 0 ? 1.8 : 0.9)],
+          [x + direction * unit * 3.2, y - unit * (side > 0 ? 3.3 : 2.4)],
+          [x + direction * unit * 4.4, y - unit * (side > 0 ? 4.4 : 3.7)],
+        ];
+        drawOrganicStroke(ctx, twigs, outline, unit * 1.1 + 1);
+        drawOrganicStroke(ctx, twigs, trunk, unit * 1.1);
+        if (segment % 2 === 0) {
+          const microTwig = [
+            twigs[1],
+            [twigs[1][0] + direction * unit, twigs[1][1] - unit * 1.2],
+            [twigs[1][0] + direction * unit * 1.8, twigs[1][1] - unit * 2],
+          ];
+          drawOrganicStroke(ctx, microTwig, outline, Math.max(2, unit * 0.65));
+          drawOrganicStroke(ctx, microTwig, trunk, Math.max(1, unit * 0.4));
+        }
+      });
+    }
   });
+
+  canopyAnchors.forEach(([column, row], anchorIndex) => {
+    const x = centerX + column * unit * 2.15;
+    const y = topY + row * unit * 2.3;
+    const size = unit * (anchorIndex % 3 === 0 ? 1.1 : 0.86);
+    const seed = anchorIndex + index * 3 + Math.floor(time / 5000);
+    drawCanopy(ctx, x + unit, y + unit, size, [colors[0], colors[0], colors[1]], seed);
+    drawCanopy(ctx, x, y, size * 0.72, [colors[1], colors[2], colors[1]], seed + 2);
+    drawCanopy(ctx, x - unit, y - unit, size * 0.42, [colors[2], colors[3], colors[2]], seed + 4);
+  });
+  ctx.restore();
 }
 
-function drawSun(ctx, width, height, block) {
-  const x = width * 0.82;
-  const y = height * 0.15;
-  const size = block * 5;
+function createForestCache(width, height, theme) {
+  const createLayer = (depth) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width);
+    canvas.height = Math.round(height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return canvas;
+    TREES.forEach((tree, index) => {
+      if (tree.depth === depth) drawTree(ctx, width, height, tree, theme, 0, index);
+    });
+    return canvas;
+  };
+
+  return {
+    back: createLayer('back'),
+    front: createLayer('front'),
+  };
+}
+
+function drawSun(ctx, width, height, time) {
+  const size = Math.min(width, height) * 0.075;
+  const cycle = (time % CELESTIAL_CYCLE_MS) / CELESTIAL_CYCLE_MS;
+  const x = cycle * (width + size * 2) - size;
+  const arc = Math.sin(cycle * Math.PI);
+  const y = height * (0.54 - arc * 0.43);
 
   ctx.save();
+  ctx.shadowColor = 'rgba(255, 198, 114, 0.85)';
+  ctx.shadowBlur = size * 0.65;
   ctx.fillStyle = 'rgba(255, 202, 119, 0.18)';
-  ctx.fillRect(x - size * 1.7, y - size * 1.7, size * 4.4, size * 4.4);
-  ctx.fillStyle = 'rgba(255, 202, 119, 0.32)';
-  ctx.fillRect(x - size * 1.15, y - size * 1.15, size * 3.3, size * 3.3);
+  ctx.fillRect(x - size * 0.4, y - size * 0.4, size * 1.8, size * 1.8);
   ctx.fillStyle = '#ffd166';
   ctx.fillRect(x, y, size, size);
   ctx.fillStyle = '#fff1b8';
-  ctx.fillRect(x + block, y + block, size - block * 2, size - block * 2);
-  ctx.fillStyle = 'rgba(255, 239, 177, 0.85)';
-  ctx.fillRect(x + size * 0.35, y - size * 0.8, size * 0.3, size * 0.5);
-  ctx.fillRect(x + size * 0.35, y + size * 1.3, size * 0.3, size * 0.5);
-  ctx.fillRect(x - size * 0.8, y + size * 0.35, size * 0.5, size * 0.3);
-  ctx.fillRect(x + size * 1.3, y + size * 0.35, size * 0.5, size * 0.3);
+  ctx.fillRect(x + size * 0.18, y + size * 0.18, size * 0.64, size * 0.64);
   ctx.restore();
 }
 
-function drawMoon(ctx, width, height, block) {
-  const x = width * 0.82;
-  const y = height * 0.15;
-  const size = block * 5;
+function drawMoon(ctx, width, height, time) {
+  const size = Math.min(width, height) * 0.065;
+  const cycle = (time % CELESTIAL_CYCLE_MS) / CELESTIAL_CYCLE_MS;
+  const x = width - (cycle * (width + size * 2) - size);
+  const arc = Math.sin(cycle * Math.PI);
+  const y = height * (0.54 - arc * 0.43);
 
   ctx.save();
   ctx.shadowColor = 'rgba(190, 213, 255, 0.9)';
-  ctx.shadowBlur = size * 3;
-  ctx.fillStyle = 'rgba(189, 211, 255, 0.24)';
-  ctx.fillRect(x - size, y - size, size * 3, size * 3);
+  ctx.shadowBlur = size * 0.7;
+  ctx.fillStyle = 'rgba(189, 211, 255, 0.28)';
+  ctx.fillRect(x - size * 0.4, y - size * 0.4, size * 1.8, size * 1.8);
   ctx.fillStyle = '#dbeafe';
   ctx.fillRect(x, y, size, size);
-  ctx.fillStyle = '#f8f5e8';
-  ctx.fillRect(x + block, y + block, size - block * 2, size - block * 2);
   ctx.fillStyle = '#111a2e';
-  ctx.fillRect(x + size * 0.52, y - block, size * 0.9, size * 0.9);
-  ctx.fillRect(x + size * 0.62, y + size * 0.2, size * 0.9, size * 0.9);
+  ctx.fillRect(x + size * 0.45, y - size * 0.08, size * 0.7, size * 0.72);
+  ctx.fillRect(x + size * 0.6, y + size * 0.3, size * 0.6, size * 0.65);
   ctx.restore();
 }
 
-function drawCloud(ctx, cloud, width, height, block, time) {
-  const x = ((cloud.x + time * cloud.speed) % 1.2 - 0.1) * width;
-  const y = cloud.y * height;
+function drawCloud(ctx, cloud, width, height, block, time, celestialTime) {
+  const x = ((cloud.x + time * cloud.speed + celestialTime / CELESTIAL_CYCLE_MS * 0.08) % 1.2 - 0.1) * width;
+  const y = cloud.y * height + Math.sin(celestialTime * 0.0001 + cloud.x * 10) * 5;
   const unit = block * cloud.scale;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.86)';
   ctx.fillRect(x, y + unit * 2, unit * 10, unit * 2);
@@ -146,7 +310,7 @@ function drawCloud(ctx, cloud, width, height, block, time) {
   ctx.fillRect(x + unit, y + unit * 3, unit * 8, unit);
 }
 
-function drawLandscape(ctx, width, height, theme, time, stars, clouds) {
+function drawSky(ctx, width, height, theme, time, celestialTime, stars, clouds) {
   const dark = theme === 'dark';
   const sky = ctx.createLinearGradient(0, 0, 0, height);
   sky.addColorStop(0, dark ? '#080f20' : '#7dd3fc');
@@ -160,18 +324,22 @@ function drawLandscape(ctx, width, height, theme, time, stars, clouds) {
   if (dark) {
     const sceneAlpha = ctx.globalAlpha;
     stars.forEach((star) => {
-      const twinkle = 0.32 + (Math.sin(time * star.speed + star.phase) + 1) * 0.32;
-      ctx.globalAlpha = sceneAlpha * twinkle;
+      const starX = ((star.x + celestialTime / CELESTIAL_CYCLE_MS * 0.03) % 1) * width;
+      ctx.globalAlpha = sceneAlpha * (0.35 + (Math.sin(time * star.speed + star.phase) + 1) * 0.3);
       ctx.fillStyle = star.size > 2 ? '#d9e8ff' : '#ffffff';
-      ctx.fillRect(Math.round(star.x * width), Math.round(star.y * height), star.size, star.size);
+      ctx.fillRect(Math.round(starX), Math.round(star.y * height), star.size, star.size);
     });
     ctx.globalAlpha = sceneAlpha;
-    drawMoon(ctx, width, height, block);
+    drawMoon(ctx, width, height, celestialTime);
   } else {
-    drawSun(ctx, width, height, block);
-    clouds.forEach((cloud) => drawCloud(ctx, cloud, width, height, block, time));
+    drawSun(ctx, width, height, celestialTime);
+    clouds.forEach((cloud) => drawCloud(ctx, cloud, width, height, block, time, celestialTime));
   }
+}
 
+function drawWater(ctx, width, height, theme, time) {
+  const dark = theme === 'dark';
+  const block = Math.max(6, Math.round(width / 120));
   const horizon = height * 0.57;
   ctx.fillStyle = dark ? '#26364a' : '#94a3b8';
   for (let x = 0; x < width; x += block * 2) {
@@ -190,14 +358,6 @@ function drawLandscape(ctx, width, height, theme, time, stars, clouds) {
       ctx.fillRect(x, y, block * (2 + (row % 3)), Math.max(2, block / 3));
     }
   }
-
-  const trees = [
-    { x: 0.12, base: 0.73, scale: 0.72 },
-    { x: 0.52, base: 0.75, scale: 0.56 },
-    { x: 0.91, base: 0.73, scale: 0.84 },
-  ];
-  trees.forEach((tree, index) => drawTree(ctx, width, height, block, tree, theme, time, index));
-
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
   ctx.fillRect(0, riverTop - block, width, block * 2);
 }
@@ -224,31 +384,41 @@ export function PixelArtBackground() {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let width = 0;
     let height = 0;
+    let pixelRatio = 1;
     let petals = [];
+    let forestCaches = { dark: null, light: null };
     const stars = createStars();
     const clouds = createClouds();
     let lastFrame = 0;
+    let celestialTime = CELESTIAL_CYCLE_MS * 0.2;
     let frameId = null;
     let reducedMotion = mediaQuery.matches;
     let targetTheme = root.getAttribute('data-theme') || 'dark';
     let previousTheme = targetTheme;
     let transitionStart = 0;
 
+    const drawScene = (theme, timestamp, alpha = 1) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawSky(ctx, width, height, theme, timestamp, celestialTime, stars, clouds);
+      const forest = forestCaches[theme];
+      if (forest?.back) ctx.drawImage(forest.back, 0, 0, width, height);
+      drawWater(ctx, width, height, theme, timestamp);
+      if (forest?.front) ctx.drawImage(forest.front, 0, 0, width, height);
+      ctx.restore();
+    };
+
     const render = (timestamp = 0) => {
       const elapsed = lastFrame ? Math.min(timestamp - lastFrame, 40) : 16;
       lastFrame = timestamp;
+      if (!reducedMotion) celestialTime += elapsed;
       ctx.clearRect(0, 0, width, height);
-
       const progress = transitionStart
         ? Math.min((timestamp - transitionStart) / THEME_TRANSITION_MS, 1)
         : 1;
-      drawLandscape(ctx, width, height, previousTheme, timestamp, stars, clouds);
-      if (progress < 1) {
-        ctx.save();
-        ctx.globalAlpha = progress;
-        drawLandscape(ctx, width, height, targetTheme, timestamp, stars, clouds);
-        ctx.restore();
-      } else {
+      drawScene(previousTheme, timestamp, progress < 1 ? 1 - progress : 1);
+      if (progress < 1) drawScene(targetTheme, timestamp, progress);
+      else {
         previousTheme = targetTheme;
         transitionStart = 0;
       }
@@ -264,7 +434,6 @@ export function PixelArtBackground() {
             });
           }
         }
-
         const lightColor = petal.size > 4 ? '#ff8da1' : '#ffb7c5';
         const darkColor = petal.size > 4 ? '#ff4fa3' : '#f472b6';
         const colorForTheme = (theme) => (theme === 'dark' ? darkColor : lightColor);
@@ -278,19 +447,27 @@ export function PixelArtBackground() {
         ctx.fillRect(Math.round(petal.x), Math.round(petal.y), petal.size, petal.size);
         ctx.restore();
       });
-
       if (!reducedMotion) frameId = requestAnimationFrame(render);
     };
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      width = rect.width || window.innerWidth;
-      height = rect.height || window.innerHeight;
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const nextWidth = rect.width || window.innerWidth;
+      const nextHeight = rect.height || window.innerHeight;
+      const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      if (nextWidth === width && nextHeight === height && nextPixelRatio === pixelRatio) return;
+      width = nextWidth;
+      height = nextHeight;
+      pixelRatio = nextPixelRatio;
       canvas.width = Math.round(width * pixelRatio);
       canvas.height = Math.round(height * pixelRatio);
       ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      ctx.imageSmoothingEnabled = false;
       petals = Array.from({ length: PETAL_COUNT }, () => createPetal(width, height));
+      forestCaches = {
+        dark: createForestCache(width, height, 'dark'),
+        light: createForestCache(width, height, 'light'),
+      };
       lastFrame = 0;
       if (reducedMotion) render(performance.now());
     };
@@ -313,9 +490,7 @@ export function PixelArtBackground() {
       if (reducedMotion) {
         previousTheme = targetTheme;
         render(performance.now());
-      } else {
-        startAnimation();
-      }
+      } else startAnimation();
     };
     const updateMotion = (event) => {
       reducedMotion = event.matches;
@@ -329,6 +504,8 @@ export function PixelArtBackground() {
     };
 
     const observer = new MutationObserver(updateTheme);
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(canvas);
     observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
     mediaQuery.addEventListener('change', updateMotion);
     window.addEventListener('resize', resize);
@@ -337,6 +514,7 @@ export function PixelArtBackground() {
 
     return () => {
       observer.disconnect();
+      resizeObserver.disconnect();
       mediaQuery.removeEventListener('change', updateMotion);
       window.removeEventListener('resize', resize);
       stopAnimation();

@@ -33,6 +33,7 @@
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
   --text-inverse: #0f172a;
+  --task-description-color: var(--text-muted);
 
   --glass-bg-column: rgba(15, 23, 42, 0.45);
   --glass-border-column: rgba(255, 255, 255, 0.08);
@@ -91,13 +92,14 @@
   --glass-shadow-column: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
   --glass-blur-column: var(--glass-blur-md);
 
-  --glass-bg-card: rgba(255, 255, 255, 0.07);
-  --glass-bg-card-hover: rgba(255, 255, 255, 0.12);
+  --glass-bg-card: rgba(15, 23, 42, 0.72);
+  --glass-bg-card-hover: rgba(15, 23, 42, 0.82);
   --glass-border-card: rgba(255, 255, 255, 0.1);
   --glass-border-card-hover: rgba(255, 255, 255, 0.18);
   --glass-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.25);
   --glass-shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
   --glass-blur-card: var(--glass-blur-md);
+  --task-description-color: #e2e8f0;
 
   --pixel-bg-opacity: 1;
 
@@ -594,7 +596,7 @@ body {
 
 .task-description {
   font-size: 0.75rem;
-  color: #e2e8f0;
+  color: var(--task-description-color);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
   line-height: 1.5;
   margin: 0 0 var(--space-sm);
