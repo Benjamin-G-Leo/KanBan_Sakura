@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { TaskCard } from './TaskCard';
 import { AddTaskForm } from './AddTaskForm';
 
-export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onTaskAdd }) {
+export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onTaskAdd, isAiModeEnabled }) {
   const { setNodeRef } = useDroppable({ id: columnId });
 
   return (
@@ -13,6 +13,11 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
         <h3 className="column-title">
           {title}
           <span className="column-count">{tasks.length}</span>
+          {isAiModeEnabled && (
+            <span className="ml-2 text-[10px] font-medium uppercase tracking-[0.12em] text-amber-300/80">
+              Smart Priority Sort
+            </span>
+          )}
         </h3>
       </div>
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>

@@ -1,6 +1,26 @@
 import express from 'express';
+import { callOpenRouter, buildCompletionRequest } from '../services/aiService.js';
 
 const router = express.Router();
+
+/**
+ * Middleware: Validate that the user provided their own OpenRouter API key.
+ * The key is passed from the client as a custom header 'x-user-api-key',
+ * ensuring the hosting environment is entirely free and decoupled from
+ * any server-side credentials.
+ */
+function requireUserApiKey(req, res, next) {
+  const userApiKey = req.headers['x-user-api-key'];
+
+  if (!userApiKey || typeof userApiKey !== 'string' || !userApiKey.trim()) {
+    return res.status(401).json({
+      error: 'API Key missing. Please provide your own OpenRouter key in the application settings.'
+    });
+  }
+
+  req.userApiKey = userApiKey;
+  next();
+}
 
 /**
  * POST /api/ai/breakdown
@@ -18,26 +38,41 @@ const router = express.Router();
  * });
  * const data = await response.json();
  */
-router.post('/breakdown', async (req, res) => {
+router.post('/breakdown', requireUserApiKey, async (req, res) => {
   try {
     const { taskId, title, description } = req.body;
 
     if (!taskId || !title) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: taskId and title are required' 
+      return res.status(400).json({
+        error: 'Missing required fields: taskId and title are required'
       });
     }
 
-    // Simulated 1.5-second latency to mimic real network conditions
-    // TODO: Replace this setTimeout with actual LLM API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const prompt = `You are an AI project management assistant. Break the task "${title}"${description ? ` (${description})` : ''} into 3-5 clear, actionable, short subtask strings. Respond ONLY with a flat JSON array of strings, e.g. ["Subtask A", "Subtask B", "Subtask C"]. No markdown, no extra text.`;
 
-    const subtasks = generateSubtasks(title, description);
-    const standaloneTasks = generateStandaloneTasks(title, description);
+    const openrouterResponse = await callOpenRouter(req.userApiKey, buildCompletionRequest(prompt));
 
-    res.json({ subtasks, standaloneTasks });
+    const generatedText = openrouterResponse?.choices?.[0]?.message?.content || '';
+    let subtasks;
+    try {
+      subtasks = JSON.parse(generatedText);
+    } catch {
+      subtasks = generatedText
+        .split('\n')
+        .map(l => l.trim().replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, ''))
+        .filter(l => l.length > 0);
+    }
+
+    if (!Array.isArray(subtasks)) {
+      subtasks = [];
+    }
+
+    res.json({ subtasks });
   } catch (err) {
     console.error('AI breakdown error:', err);
+    if (err.status === 401) {
+      return res.status(401).json({ error: 'Authentication failed with OpenRouter. Please check your API key in the application settings.' });
+    }
     res.status(500).json({ error: 'Failed to generate breakdown' });
   }
 });
@@ -58,24 +93,40 @@ router.post('/breakdown', async (req, res) => {
  * });
  * const data = await response.json();
  */
-router.post('/suggestions', async (req, res) => {
+router.post('/suggestions', requireUserApiKey, async (req, res) => {
   try {
     const { boardState } = req.body;
 
     if (!boardState || !boardState.columns) {
-      return res.status(400).json({ 
-        error: 'Invalid boardState: columns object is required' 
+      return res.status(400).json({
+        error: 'Invalid boardState: columns object is required'
       });
     }
 
-    // Simulated 1-second latency to mimic real network conditions
-    // TODO: Replace this setTimeout with actual LLM API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const prompt = `You are an AI workflow optimization assistant for a Kanban board. Analyze the following board state and return exactly 3 distinct, concise, technical advice points identifying blockers or velocity improvements. Respond ONLY with a flat JSON object containing a "suggestions" key with an array of 3 strings, e.g. {"suggestions": ["Tip 1", "Tip 2", "Tip 3"]}. No markdown, no extra text.\n\nBoard state:\n${JSON.stringify(boardState)}`;
 
-    const suggestions = analyzeBoardState(boardState);
-    res.json(suggestions);
+    const openrouterResponse = await callOpenRouter(req.userApiKey, buildCompletionRequest(prompt));
+
+    const generatedText = openrouterResponse?.choices?.[0]?.message?.content || '';
+    let parsed;
+    try {
+      parsed = JSON.parse(generatedText);
+    } catch {
+      parsed = { suggestions: analyzeBoardState(boardState) };
+    }
+
+    if (!parsed.suggestions || !Array.isArray(parsed.suggestions) || parsed.suggestions.length < 3) {
+      parsed = { suggestions: analyzeBoardState(boardState) };
+    } else {
+      parsed.suggestions = parsed.suggestions.slice(0, 3);
+    }
+
+    res.json(parsed);
   } catch (err) {
     console.error('AI suggestions error:', err);
+    if (err.status === 401) {
+      return res.status(401).json({ error: 'Authentication failed with OpenRouter. Please check your API key in the application settings.' });
+    }
     res.status(500).json({ error: 'Failed to generate suggestions' });
   }
 });

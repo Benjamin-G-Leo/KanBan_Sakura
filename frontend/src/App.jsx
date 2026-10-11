@@ -1,279 +1,146 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
-import { KanbanProvider, useKanban } from './context/KanbanContext';
 import { PixelArtBackground } from './components/PixelArtBackground';
+import { SettingsModal } from './components/SettingsModal';
+import { KanbanProvider } from './context/KanbanContext';
+import { useKanban } from './context/useKanban';
 
 function SuggestionsDrawer() {
-  const { suggestionsOpen, suggestions, suggestionsLoading, toggleSuggestions } = useKanban();
+  const { isAiModeEnabled, suggestionsOpen, suggestions, suggestionsLoading, toggleSuggestions } = useKanban();
 
-  if (!suggestionsOpen) return null;
+  if (!isAiModeEnabled || !suggestionsOpen) return null;
 
   return (
-    <>      <div 
-        className="drawer-overlay"
-        onClick={toggleSuggestions}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 99,
-          animation: 'fadeIn 0.2s ease-out',
-        }}
-      />
-      <aside 
-        className="suggestions-drawer"
-        style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: '380px',
-          maxWidth: '100vw',
-          background: 'var(--glass-bg-column)',
-          borderLeft: '1px solid var(--glass-border-column)',
-          backdropFilter: 'blur(var(--glass-blur-lg))',
-          zIndex: 100,
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: 'var(--glass-shadow-column)',
-        }}
-      >
-        <div style={{
-          padding: 'var(--space-lg)',
-          borderBottom: '1px solid var(--glass-border-column)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>          <h2 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: 'var(--text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-sm)',
-          }}>
-            <span style={{ 
-              fontSize: '1.25rem',
-              color: 'var(--priority-medium)',
-            }}>✦</span>
-            AI Suggestions
-          </h2>
-          <button 
+    <>
+      <div className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-sm" onClick={toggleSuggestions} />
+      <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-md border-l border-white/10 bg-slate-900/90 p-4 text-white shadow-2xl backdrop-blur-xl">
+        <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+          <h2 className="text-lg font-semibold">AI Suggestions</h2>
+          <button
+            type="button"
             onClick={toggleSuggestions}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--glass-border-card)',
-              background: 'var(--glass-bg-card)',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all var(--transition-fast)',
-            }}
-            onMouseEnter={(e) => { e.target.style.color = 'var(--text-primary)'; e.target.style.background = 'var(--glass-bg-column)'; }}
-            onMouseLeave={(e) => { e.target.style.color = 'var(--text-secondary)'; e.target.style.background = 'var(--glass-bg-card)'; }}
-            aria-label="Close suggestions"
+            className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-slate-200 hover:bg-white/10"
+            aria-label="Close AI Suggestions"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            Close
           </button>
         </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-md)' }}>          {suggestionsLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', gap: 'var(--space-md)' }}>
-              <div className="loading-spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Generating insights...</span>
-            </div>
-          ) : suggestions.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: 'var(--space-xl)',
-              color: 'var(--text-muted)',
-            }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto var(--space-md)', opacity: 0.5 }}>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              </svg>
-              <p style={{ fontSize: '0.875rem', marginBottom: 'var(--space-xs)' }}>No suggestions yet</p>
-              <p style={{ fontSize: '0.75rem' }}>AI will analyze your board and provide insights</p>
-            </div>
-          ) : (
-            <ul style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>              {suggestions.map((suggestion, index) => (
-                <li key={suggestion.id || index} className="suggestion-card" style={{
-                  background: 'var(--glass-bg-card)',
-                  border: '1px solid var(--glass-border-card)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: 'var(--space-md)',
-                  backdropFilter: 'blur(var(--glass-blur-sm))',
-                  transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)',
-                  boxShadow: 'var(--glass-shadow-card)',
-                }} onMouseEnter={(e) => { e.target.style.borderColor = 'var(--glass-border-card-hover)'; e.target.style.boxShadow = 'var(--glass-shadow-card-hover)'; }}
-                     onMouseLeave={(e) => { e.target.style.borderColor = 'var(--glass-border-card)'; e.target.style.boxShadow = 'var(--glass-shadow-card)'; }}>
-                  <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start' }}>                    <div style={{ 
-                      flexShrink: 0,
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'linear-gradient(135deg, var(--priority-medium), var(--priority-low))',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-inverse)',
-                      fontWeight: '700',
-                      fontSize: '0.875rem',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-                    }}>
-                      {index + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 'var(--space-xs)', 
-                        marginBottom: 'var(--space-xs)' 
-                      }}>
-                        <span style={{ 
-                          fontSize: '0.625rem',
-                          fontWeight: '600',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          padding: '0.125rem 0.5rem',
-                          borderRadius: '9999px',
-                          background: 'var(--glass-bg-column)',
-                          border: '1px solid var(--glass-border-card)',
-                          color: 'var(--text-muted)',
-                        }}>
-                          {suggestion.type || 'insight'}
-                        </span>
-                        {suggestion.priority && (
-                          <span style={{ 
-                            fontSize: '0.625rem',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            padding: '0.125rem 0.5rem',
-                            borderRadius: '9999px',
-                            background: suggestion.priority === 'high' ? 'rgba(239, 68, 68, 0.2)' : suggestion.priority === 'medium' ? 'rgba(251, 191, 36, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                            border: '1px solid ' + (suggestion.priority === 'high' ? 'var(--priority-high)' : suggestion.priority === 'medium' ? 'var(--priority-medium)' : 'var(--priority-low)'),
-                            color: suggestion.priority === 'high' ? 'var(--priority-high)' : suggestion.priority === 'medium' ? 'var(--priority-medium)' : 'var(--priority-low)',
-                          }}>
-                            {suggestion.priority}
-                          </span>
-                        )}
-                      </div>
-                      <h4 style={{ 
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: 'var(--text-primary)',
-                        marginBottom: 'var(--space-xs)',
-                        lineHeight: 1.4,
-                      }}>
-                        {suggestion.title || suggestion.text}
-                      </h4>
-                      <p style={{ 
-                        fontSize: '0.8125rem',
-                        color: 'var(--text-secondary)',
-                        lineHeight: 1.5,
-                      }}>
-                        {suggestion.description || suggestion.detail || suggestion.recommendation || ''}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+
+        {suggestionsLoading ? (
+          <div className="flex h-40 items-center justify-center text-slate-300">Generating insights...</div>
+        ) : suggestions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+            No suggestions yet. Open the board with more work to analyze flow.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {suggestions.map((suggestion, index) => (
+              <li key={suggestion.id || `${suggestion.title}-${index}`} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="inline-flex rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-emerald-200">
+                    Insight {index + 1}
+                  </span>
+                  {suggestion.priority && (
+                    <span className="text-[10px] uppercase tracking-[0.12em] text-slate-300">
+                      {suggestion.priority}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-100">{suggestion.recommendation || suggestion}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </aside>
     </>
   );
 }
 
 function AppContent() {
-  const { toggleSuggestions, suggestionsOpen } = useKanban();
-  const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    return savedTheme;
-  });
+  const {
+    apiKey,
+    settingsModalOpen,
+    toggleSettingsModal,
+    handleSaveApiKey,
+    toggleSuggestions,
+    suggestionsOpen,
+    isAiModeEnabled,
+    setAiModeEnabled,
+  } = useKanban();
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }, []);
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    document.documentElement.dispatchEvent(new CustomEvent('themechange'));
+  const isKeyConnected = Boolean(apiKey);
+
+  const handleAiModeChange = (event) => {
+    setAiModeEnabled(event.target.checked);
   };
 
   return (
-    <div className="app-wrapper min-h-screen">
+    <div className="app-wrapper min-h-screen bg-slate-950 text-white">
       <PixelArtBackground />
-      <header className="app-header px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Kanban Board</h1>
-            <span style={{ color: 'var(--text-secondary)' }}>AI-Powered Task Management</span>
+
+      <header className="relative z-10 border-b border-white/10 bg-slate-950/50 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.24em] text-emerald-300/80">AI Kanban</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Project Board</h1>
           </div>
+
           <div className="flex items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
+              <span>AI Mode</span>
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={isAiModeEnabled}
+                onChange={handleAiModeChange}
+                aria-label="Toggle AI Mode"
+              />
+              <span className={`relative h-6 w-11 rounded-full transition-colors ${isAiModeEnabled ? 'bg-emerald-500' : 'bg-slate-600'} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-emerald-300`}>
+                <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform ${isAiModeEnabled ? 'translate-x-5' : ''}`} />
+              </span>
+            </label>
+
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
+              <span className={`h-2.5 w-2.5 rounded-full ${isKeyConnected ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]' : 'bg-slate-500'}`} />
+              {isKeyConnected ? 'Key Connected' : 'Set API Key'}
+            </div>
+
+            {isAiModeEnabled && (
+              <button
+                type="button"
+                onClick={toggleSuggestions}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
+                aria-label={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
+              >
+                {suggestionsOpen ? 'Close Insights' : 'Open Insights'}
+              </button>
+            )}
+
             <button
-              onClick={toggleSuggestions}
-              className="theme-toggle"
-              aria-label={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
-              title={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
-              style={{
-                ...(suggestionsOpen ? { 
-                  background: 'var(--glass-bg-card-hover)',
-                  borderColor: 'var(--priority-medium)',
-                  boxShadow: '0 0 12px rgba(251, 191, 36, 0.3)',
-                } : {})
-              }}
+              type="button"
+              onClick={toggleSettingsModal}
+              className="rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-100 hover:bg-emerald-500/20"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: suggestionsOpen ? 'var(--priority-medium)' : 'inherit' }}>
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </button>
-            <button
-              onClick={toggleTheme}
-              className="theme-toggle"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Current: Dark. Click to switch to Light.' : 'Current: Light. Click to switch to Dark.'}
-            >
-              {theme === 'dark' ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
+              {isKeyConnected ? 'Update Key' : 'Set API Key'}
             </button>
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 py-6">
+
+      <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <KanbanBoard />
       </main>
+
       <SuggestionsDrawer />
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={toggleSettingsModal}
+        onSave={handleSaveApiKey}
+      />
     </div>
   );
 }

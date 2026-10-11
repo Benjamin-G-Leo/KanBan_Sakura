@@ -2,7 +2,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Column } from './Column';
 import { COLUMNS } from './constants';
-import { useKanban } from '../context/KanbanContext';
+import { useKanban } from '../context/useKanban';
 
 export function KanbanBoard() {
   const {
@@ -12,6 +12,7 @@ export function KanbanBoard() {
     handleTaskDelete,
     handleTaskAdd,
     handleDragEnd,
+    isAiModeEnabled,
   } = useKanban();
 
   const sensors = useSensors(
@@ -39,6 +40,7 @@ export function KanbanBoard() {
             onTaskUpdate={handleTaskUpdate}
             onTaskDelete={handleTaskDelete}
             onTaskAdd={handleTaskAdd}
+            isAiModeEnabled={isAiModeEnabled}
           />
         ))}
       </div>

@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import { useKanban } from '../context/KanbanContext';
+import { useKanban } from '../context/useKanban';
 
 export function TaskCard({ task, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDesc, setEditDesc] = useState(task.description || '');
-  const { handleBreakdown, breakingDown, toggleSubtasksVisibility, toggleSubtask } = useKanban();
+  const {
+    handleBreakdown,
+    breakingDown,
+    toggleSubtasksVisibility,
+    toggleSubtask,
+    isAiModeEnabled,
+  } = useKanban();
 
   const handleSave = () => {
     onUpdate(task.id, { title: editTitle, description: editDesc });
@@ -19,7 +25,7 @@ export function TaskCard({ task, onUpdate, onDelete }) {
   };
 
   const isBreakingDown = breakingDown === task.id;
-  const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+  const hasSubtasks = isAiModeEnabled && task.subtasks && task.subtasks.length > 0;
   const showSubtasks = task.showSubtasks && hasSubtasks;
   const priorityClass = task.priority === 'high' ? 'high' : task.priority === 'low' ? 'low' : 'medium';
   const isAI = task.isAI || task.isAiGenerated;
@@ -56,7 +62,7 @@ export function TaskCard({ task, onUpdate, onDelete }) {
               <div className='flex items-start justify-between gap-2'>
                 <h4 className='task-title flex-1'>{task.title}</h4>
                 <div className='flex items-center gap-2 flex-shrink-0'>
-                  {isAI && <span className='ai-badge flex-shrink-0'>AI</span>}
+                  {isAiModeEnabled && isAI && <span className='ai-badge flex-shrink-0'>AI</span>}
                   {hasSubtasks && (
                     <span className='subtask-count' style={{
                       fontSize: '0.625rem',
@@ -167,37 +173,39 @@ export function TaskCard({ task, onUpdate, onDelete }) {
                 >
                   Edit
                 </button>
-                <button
-                  onClick={() => handleBreakdown(task)}
-                  disabled={isBreakingDown}
-                  className='task-action-btn breakdown-btn'
-                  style={{
-                    color: 'var(--priority-medium)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-xs)',
-                    fontWeight: '500',
-                  }}
-                >
-                  {isBreakingDown ? (
-                    <>
-                      <span className='breakdown-spinner' style={{
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid var(--glass-border-column)',
-                        borderTopColor: 'var(--priority-medium)',
-                        borderRadius: '50%',
-                        animation: 'spin 0.8s linear infinite',
-                      }} />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ fontSize: '0.875rem' }}>✦</span>
-                      Breakdown
-                    </>
-                  )}
-                </button>
+                {isAiModeEnabled && (
+                  <button
+                    onClick={() => handleBreakdown(task)}
+                    disabled={isBreakingDown}
+                    className='task-action-btn breakdown-btn'
+                    style={{
+                      color: 'var(--priority-medium)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-xs)',
+                      fontWeight: '500',
+                    }}
+                  >
+                    {isBreakingDown ? (
+                      <>
+                        <span className='breakdown-spinner' style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid var(--glass-border-column)',
+                          borderTopColor: 'var(--priority-medium)',
+                          borderRadius: '50%',
+                          animation: 'spin 0.8s linear infinite',
+                        }} />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: '0.875rem' }}>✦</span>
+                        Breakdown
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   onClick={() => onDelete(task.id)}
                   className='task-action-btn delete'

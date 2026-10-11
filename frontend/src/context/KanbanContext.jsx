@@ -1,8 +1,7 @@
-import { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useState } from 'react';
 import { API_URL, COLUMNS } from '../components/constants';
 import { getTaskBreakdown, getWorkflowSuggestions, createTaskFromAI } from '../services/aiService';
-
-const KanbanContext = createContext(null);
+import { KanbanContext } from './KanbanContextValue';
 
 const initialState = {
   tasks: [],
@@ -11,7 +10,27 @@ const initialState = {
   suggestionsOpen: false,
   suggestions: [],
   suggestionsLoading: false,
+  apiKey: null,
+  apiKeyLoaded: false,
+  settingsModalOpen: false,
+  isAiModeEnabled: false,
 };
+
+function getStoredApiKey() {
+  try {
+    return localStorage.getItem('openrouter_api_key') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getStoredAiMode() {
+  try {
+    return localStorage.getItem('kanban_ai_mode_enabled') === 'true';
+  } catch (e) {
+    return false;
+  }
+}
 
 function kanbanReducer(state, action) {
   switch (action.type) {
@@ -70,10 +89,22 @@ function kanbanReducer(state, action) {
       };
     case 'TOGGLE_SUGGESTIONS':
       return { ...state, suggestionsOpen: !state.suggestionsOpen };
+    case 'CLOSE_SUGGESTIONS':
+      return { ...state, suggestionsOpen: false };
     case 'SET_SUGGESTIONS':
       return { ...state, suggestions: action.payload, suggestionsLoading: false };
     case 'SET_SUGGESTIONS_LOADING':
       return { ...state, suggestionsLoading: action.payload };
+    case 'SET_API_KEY':
+      return { ...state, apiKey: action.payload, apiKeyLoaded: true };
+    case 'SET_API_KEY_LOADED':
+      return { ...state, apiKeyLoaded: true };
+    case 'OPEN_SETTINGS_MODAL':
+      return { ...state, settingsModalOpen: true };
+    case 'CLOSE_SETTINGS_MODAL':
+      return { ...state, settingsModalOpen: false };
+    case 'SET_AI_MODE_ENABLED':
+      return { ...state, isAiModeEnabled: action.payload };
     default:
       return state;
   }
@@ -106,7 +137,53 @@ export function KanbanProvider({ children }) {
 
   useEffect(() => {
     fetchTasks();
+    // Load API key from localStorage on mount
+    const key = getStoredApiKey();
+    if (key) {
+      dispatch({ type: 'SET_API_KEY', payload: key });
+    }
+    dispatch({ type: 'SET_AI_MODE_ENABLED', payload: getStoredAiMode() });
+    dispatch({ type: 'SET_API_KEY_LOADED' });
   }, [fetchTasks]);
+
+  const checkApiKey = useCallback(() => {
+    const key = getStoredApiKey();
+    if (!key) {
+      window.alert('API Key missing. Please provide your own OpenRouter key in the application settings.');
+      dispatch({ type: 'OPEN_SETTINGS_MODAL' });
+      return null;
+    }
+    return key;
+  }, []);
+
+  const toggleSettingsModal = useCallback(() => {
+    dispatch({ type: state.settingsModalOpen ? 'CLOSE_SETTINGS_MODAL' : 'OPEN_SETTINGS_MODAL' });
+  }, [state.settingsModalOpen]);
+
+  const handleSaveApiKey = useCallback((key) => {
+    const normalizedKey = String(key || '').trim();
+    localStorage.setItem('openrouter_api_key', normalizedKey);
+    dispatch({ type: 'SET_API_KEY', payload: normalizedKey });
+  }, []);
+
+  const setAiModeEnabled = useCallback((enabled) => {
+    const nextEnabled = Boolean(enabled);
+    localStorage.setItem('kanban_ai_mode_enabled', String(nextEnabled));
+    dispatch({
+      type: 'SET_AI_MODE_ENABLED',
+      payload: nextEnabled,
+    });
+    if (!nextEnabled) {
+      dispatch({ type: 'CLOSE_SETTINGS_MODAL' });
+      dispatch({ type: 'CLOSE_SUGGESTIONS' });
+      dispatch({ type: 'SET_BREAKING_DOWN', payload: null });
+    }
+
+    if (nextEnabled && !getStoredApiKey()) {
+      window.alert('API Key missing. Please provide your own OpenRouter key in the application settings.');
+      dispatch({ type: 'OPEN_SETTINGS_MODAL' });
+    }
+  }, []);
 
   const handleTaskUpdate = useCallback(async (id, updates) => {
     try {
@@ -217,7 +294,12 @@ export function KanbanProvider({ children }) {
     [state.tasks, handleTaskUpdate]
   );
 
-  const handleBreakdown = useCallback(async (task) => {
+    const handleBreakdown = useCallback(async (task) => {
+    const apiKey = checkApiKey();
+    if (!apiKey) {
+      console.warn('API key required for breakdown');
+      return;
+    }
     dispatch({ type: 'SET_BREAKING_DOWN', payload: task.id });
     try {
       const result = await getTaskBreakdown(task.id, {
@@ -257,9 +339,14 @@ export function KanbanProvider({ children }) {
       console.error('Failed to breakdown task:', err);
       dispatch({ type: 'SET_BREAKING_DOWN', payload: null });
     }
-  }, []);
+  }, [checkApiKey]);
 
   const handleFetchSuggestions = useCallback(async () => {
+    const apiKey = checkApiKey();
+    if (!apiKey) {
+      console.warn('API key required for suggestions');
+      return;
+    }
     dispatch({ type: 'SET_SUGGESTIONS_LOADING', payload: true });
     try {
       const boardState = {
@@ -278,14 +365,15 @@ export function KanbanProvider({ children }) {
       console.error('Failed to fetch suggestions:', err);
       dispatch({ type: 'SET_SUGGESTIONS_LOADING', payload: false });
     }
-  }, [state.tasks]);
+  }, [state.tasks, checkApiKey]);
 
   const toggleSuggestions = useCallback(() => {
+    if (!state.isAiModeEnabled) return;
     dispatch({ type: 'TOGGLE_SUGGESTIONS' });
     if (!state.suggestionsOpen) {
       handleFetchSuggestions();
     }
-  }, [state.suggestionsOpen, handleFetchSuggestions]);
+  }, [state.isAiModeEnabled, state.suggestionsOpen, handleFetchSuggestions]);
 
   const toggleSubtasksVisibility = useCallback((taskId) => {
     dispatch({ type: 'TOGGLE_SUBTASKS_VISIBILITY', payload: taskId });
@@ -302,6 +390,10 @@ export function KanbanProvider({ children }) {
     suggestionsOpen: state.suggestionsOpen,
     suggestions: state.suggestions,
     suggestionsLoading: state.suggestionsLoading,
+    apiKey: state.apiKey,
+    apiKeyLoaded: state.apiKeyLoaded,
+    settingsModalOpen: state.settingsModalOpen,
+    isAiModeEnabled: state.isAiModeEnabled,
     handleTaskUpdate,
     handleTaskDelete,
     handleTaskAdd,
@@ -310,15 +402,10 @@ export function KanbanProvider({ children }) {
     toggleSuggestions,
     toggleSubtasksVisibility,
     toggleSubtask,
+    toggleSettingsModal,
+    handleSaveApiKey,
+    setAiModeEnabled,
   };
 
   return <KanbanContext.Provider value={value}>{children}</KanbanContext.Provider>;
-}
-
-export function useKanban() {
-  const context = useContext(KanbanContext);
-  if (!context) {
-    throw new Error('useKanban must be used within a KanbanProvider');
-  }
-  return context;
 }
