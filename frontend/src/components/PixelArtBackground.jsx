@@ -63,6 +63,24 @@ function drawOrganicStroke(ctx, points, color, width) {
   ctx.stroke();
 }
 
+function drawBezierStroke(ctx, start, controls, end, color, width) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(start[0], start[1]);
+  ctx.bezierCurveTo(
+    controls[0][0],
+    controls[0][1],
+    controls[1][0],
+    controls[1][1],
+    end[0],
+    end[1],
+  );
+  ctx.stroke();
+}
+
 function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
   const bumps = [
     [-10, 0, 4], [-9, -3, 4], [-7, -5, 4], [-5, -2, 5], [-4, -6, 4],
@@ -92,6 +110,82 @@ function drawCanopy(ctx, centerX, centerY, unit, colors, seed) {
 }
 
 function drawTree(ctx, width, height, tree, theme, time, index) {
+  const dark = theme === 'dark';
+  const unit = Math.max(2, PIXEL * tree.scale);
+  const centerX = tree.x * width;
+  const bankY = height * 0.68;
+  const topY = bankY - height * 0.45 * tree.scale;
+  const trunk = dark ? '#302638' : '#56353c';
+  const outline = dark ? '#171522' : '#38252b';
+  const woodLight = dark ? '#705362' : '#a36a68';
+  const colors = dark ? DARK_BLOSSOMS : LIGHT_BLOSSOMS;
+  const baseWidth = unit * (tree.depth === 'back' ? 7 : 10);
+  const trunkTop = [centerX + tree.bend * unit * 4, topY + unit * 12];
+  const trunkControls = [
+    [centerX + tree.bend * unit * 2, bankY - height * 0.12],
+    [centerX - tree.bend * unit * 2, topY + height * 0.16],
+  ];
+
+  ctx.save();
+  ctx.globalAlpha *= tree.depth === 'back' ? 0.62 : 1;
+  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, outline, baseWidth + unit * 2);
+  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, trunk, baseWidth);
+  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, woodLight, Math.max(2, unit));
+
+  ctx.fillStyle = outline;
+  ctx.fillRect(centerX - baseWidth * 0.9, bankY - unit, baseWidth * 1.8, unit * 3);
+
+  const limbs = [
+    {
+      controls: [
+        [trunkTop[0] - unit * 2, trunkTop[1] - unit * 4],
+        [centerX - unit * 13, topY + height * 0.08],
+      ],
+      end: [centerX - unit * 22, topY + unit * 6],
+      size: 1.3,
+    },
+    {
+      controls: [
+        [trunkTop[0] + unit * 2, trunkTop[1] - unit * 5],
+        [centerX + unit * 4, topY - unit * 2],
+      ],
+      end: [centerX + unit * 7, topY - unit * 12],
+      size: 1.45,
+    },
+    {
+      controls: [
+        [trunkTop[0] + unit * 3, trunkTop[1] - unit * 2],
+        [centerX + unit * 16, topY + height * 0.13],
+      ],
+      end: [centerX + unit * 25, topY + unit * 4],
+      size: 1.2,
+    },
+  ];
+
+  limbs.forEach((limb, limbIndex) => {
+    const branchWidth = unit * limb.size;
+    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, outline, branchWidth + unit * 2);
+    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, trunk, branchWidth);
+    drawBezierStroke(ctx, trunkTop, limb.controls, limb.end, woodLight, Math.max(2, unit * 0.55));
+
+    const seed = index * 31 + limbIndex * 17 + Math.floor(time / 5000);
+    drawCanopy(ctx, limb.end[0] + unit, limb.end[1], unit * (2.3 - limbIndex * 0.18), [colors[0], colors[0], colors[1]], seed);
+    drawCanopy(ctx, limb.end[0], limb.end[1] - unit * 2, unit * 1.55, [colors[1], colors[2], colors[1]], seed + 2);
+    drawCanopy(ctx, limb.end[0] - unit * 2, limb.end[1] + unit, unit * 0.9, [colors[2], colors[3], colors[2]], seed + 4);
+  });
+
+  const roots = [
+    [[centerX, bankY], [centerX - unit * 7, bankY + unit], [centerX - unit * 14, bankY + unit * 2]],
+    [[centerX, bankY], [centerX + unit * 6, bankY + unit], [centerX + unit * 13, bankY + unit * 2]],
+  ];
+  roots.forEach((root) => {
+    drawOrganicStroke(ctx, root, outline, unit * 2.4);
+    drawOrganicStroke(ctx, root, trunk, unit * 1.5);
+  });
+  ctx.restore();
+}
+
+function drawLegacyTree(ctx, width, height, tree, theme, time, index) {
   const dark = theme === 'dark';
   const unit = Math.max(2, PIXEL * tree.scale);
   const centerX = tree.x * width;
@@ -347,7 +441,28 @@ function drawWater(ctx, width, height, theme, time) {
     ctx.fillRect(x, peak, block * 3, height - peak);
   }
 
-  const riverTop = height * 0.68;
+  const riverTop = height * 0.76;
+  const shoreTop = height * 0.62;
+  ctx.fillStyle = dark ? '#b58a68' : '#e2c9a1';
+  ctx.beginPath();
+  ctx.moveTo(0, shoreTop);
+  for (let x = 0; x <= width; x += block * 2) {
+    const y = shoreTop + Math.sin(x * 0.014) * block * 0.7;
+    ctx.lineTo(x, y);
+  }
+  for (let x = width; x >= 0; x -= block * 2) {
+    const y = riverTop + Math.sin(x * 0.011 + 1.8) * block * 0.7;
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = dark ? '#80604f' : '#b5936b';
+  for (let x = block; x < width; x += block * 7) {
+    const y = shoreTop + block * (2 + ((x / block) % 4));
+    ctx.fillRect(x, y, block * 2, Math.max(2, block / 2));
+    ctx.fillRect(x + block * 3, y + block * 2, block, Math.max(2, block / 3));
+  }
+
   ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
   ctx.fillRect(0, riverTop, width, height - riverTop);
   ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
@@ -360,6 +475,32 @@ function drawWater(ctx, width, height, theme, time) {
   }
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
   ctx.fillRect(0, riverTop - block, width, block * 2);
+}
+
+function drawBushes(ctx, width, height, theme) {
+  const dark = theme === 'dark';
+  const block = Math.max(3, Math.round(width / 170));
+  const shoreY = height * 0.69;
+  const positions = [0.16, 0.29, 0.48, 0.76, 0.88];
+  const palettes = dark
+    ? ['#1f513e', '#2d6a4f', '#40916c']
+    : ['#24553e', '#2d6a4f', '#52b788'];
+
+  positions.forEach((position, index) => {
+    const x = position * width;
+    const y = shoreY + Math.sin(index * 2.7) * block;
+    const size = block * (index % 2 === 0 ? 2.8 : 2.3);
+    ctx.fillStyle = palettes[0];
+    ctx.fillRect(x - size * 1.35, y, size * 2.7, size * 0.9);
+    ctx.fillRect(x - size, y - size * 0.65, size * 2, size * 0.8);
+    ctx.fillRect(x - size * 0.4, y - size * 1.15, size * 0.9, size * 0.7);
+    ctx.fillStyle = palettes[1];
+    ctx.fillRect(x - size * 0.9, y - size * 0.5, size * 0.9, size * 0.65);
+    ctx.fillRect(x + size * 0.1, y - size * 0.9, size, size * 0.75);
+    ctx.fillStyle = palettes[2];
+    ctx.fillRect(x - size * 0.45, y - size * 0.85, size * 0.55, size * 0.45);
+    ctx.fillRect(x + size * 0.55, y - size * 0.35, size * 0.45, size * 0.45);
+  });
 }
 
 function mixColor(from, to, progress) {
@@ -402,8 +543,9 @@ export function PixelArtBackground() {
       ctx.globalAlpha = alpha;
       drawSky(ctx, width, height, theme, timestamp, celestialTime, stars, clouds);
       const forest = forestCaches[theme];
-      if (forest?.back) ctx.drawImage(forest.back, 0, 0, width, height);
       drawWater(ctx, width, height, theme, timestamp);
+      if (forest?.back) ctx.drawImage(forest.back, 0, 0, width, height);
+      drawBushes(ctx, width, height, theme);
       if (forest?.front) ctx.drawImage(forest.front, 0, 0, width, height);
       ctx.restore();
     };
