@@ -155,6 +155,8 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
     { direction: 1, reach: 20, lift: 20, bend: -3, offset: 2 },
   ];
   const primaryLimbs = [];
+  const midLimbs = [];
+  const midLeafAnchors = [];
   const accentTwigs = [];
   const canopyAnchors = [];
 
@@ -188,12 +190,57 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
     }
   });
 
+  const midBranches = [
+    { direction: -1, height: 0.4, reach: 20, lift: 4, bend: -3 },
+    { direction: 1, height: 0.48, reach: 22, lift: 6, bend: 3 },
+    { direction: -1, height: 0.59, reach: 24, lift: 8, bend: 4 },
+    { direction: 1, height: 0.66, reach: 21, lift: 5, bend: -4 },
+  ];
+  midBranches.forEach((branch, branchIndex) => {
+    const startY = bankY - (bankY - topY) * branch.height;
+    const start = [
+      centerX + tree.bend * unit * (branch.height * 5),
+      startY,
+    ];
+    const points = [
+      start,
+      [start[0] + branch.direction * unit * 5, start[1] - unit * 1.5],
+      [start[0] + branch.direction * unit * (branch.reach * 0.52), start[1] - unit * (branch.lift * 0.35)],
+      [start[0] + branch.direction * unit * (branch.reach + branch.bend), start[1] - unit * branch.lift],
+    ];
+    midLimbs.push(points);
+    midLeafAnchors.push(points[2], points[3]);
+    canopyAnchors.push(...points.slice(1));
+
+    // A restrained fork at each mid-level tip keeps the silhouette expansive
+    // without recreating a dense foreground grid.
+    [-1, 1].forEach((side, sideIndex) => {
+      const [x, y] = points[2];
+      const direction = branch.direction * side;
+      const twig = [
+        [x, y],
+        [x + direction * unit * 4, y - unit * (2.5 + sideIndex)],
+        [x + direction * unit * 7, y - unit * (5 + branchIndex * 0.5)],
+        [x + direction * unit * 9, y - unit * (6.5 + branchIndex * 0.5)],
+      ];
+      midLeafAnchors.push(twig[2], twig[3]);
+      canopyAnchors.push(...twig.slice(1));
+      accentTwigs.push(twig);
+    });
+  });
+
   // Layer 1: paint the wood beneath the canopy, with a visibly tapered silhouette.
   primaryLimbs.forEach((points, branchIndex) => {
     const startWidth = unit * (branchIndex < 2 ? 3.5 : 2.9);
     drawTaperedOrganicStroke(ctx, points, outline, startWidth + unit, unit * 1.3);
     drawTaperedOrganicStroke(ctx, points, trunk, startWidth, unit * 0.8);
     drawTaperedOrganicStroke(ctx, points, woodLight, unit * 0.7, Math.max(1, unit * 0.25));
+  });
+  midLimbs.forEach((points, branchIndex) => {
+    const startWidth = unit * (branchIndex % 2 === 0 ? 2.7 : 2.5);
+    drawTaperedOrganicStroke(ctx, points, outline, startWidth + unit * 0.9, unit * 0.9);
+    drawTaperedOrganicStroke(ctx, points, trunk, startWidth, unit * 0.55);
+    drawTaperedOrganicStroke(ctx, points, woodLight, unit * 0.55, Math.max(1, unit * 0.2));
   });
   const roots = [
     [[centerX, bankY], [centerX - unit * 7, bankY + unit], [centerX - unit * 14, bankY + unit * 2]],
@@ -217,6 +264,11 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
     drawCanopy(ctx, x, y + unit * 0.5, unit * 1.7, colors, seed, 'inner');
     drawCanopy(ctx, x + unit * 1.5, y - unit * 1.3, unit * 1.45, colors, seed + 1, 'inner');
     drawCanopy(ctx, x - unit * 1.4, y + unit * 1.2, unit * 1.35, colors, seed + 2, 'inner');
+  });
+  midLeafAnchors.forEach(([x, y], anchorIndex) => {
+    const seed = index * 173 + anchorIndex * 19 + Math.floor(time / 5000);
+    drawCanopy(ctx, x, y, unit * 1.2, colors, seed, 'inner');
+    drawCanopy(ctx, x + unit * 1.1, y - unit * 0.8, unit * 0.85, colors, seed + 1, 'inner');
   });
 
   // Layer 3: let only a few thin, warm twigs peek through around the edges.
