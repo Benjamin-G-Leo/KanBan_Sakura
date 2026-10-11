@@ -20,21 +20,13 @@ app.use(express.json());
 app.use('/api/ai', aiRoutes);
 
 let tasks = [
-  { id: 1, title: 'Set up project structure', description: 'Create frontend and backend folders', status: 'done', priority: 'high' },
-  { id: 2, title: 'Configure Express backend', description: 'Set up API routes and middleware', status: 'done', priority: 'high' },
-  { id: 3, title: 'Scaffold Vite + React + Tailwind', description: 'Initialize frontend with build tools', status: 'in-progress', priority: 'high' },
-  { id: 4, title: 'Create Kanban board component', description: 'Build drag-and-drop board UI', status: 'todo', priority: 'medium' },
-  { id: 5, title: 'Add task CRUD operations', description: 'Implement create, read, update, delete', status: 'todo', priority: 'medium' },
-  { id: 6, title: 'Implement drag and drop', description: 'Add @dnd-kit for column/task reordering', status: 'review', priority: 'medium' },
-  { id: 7, title: 'Add AI task suggestions', description: 'Integrate AI for task breakdown', status: 'todo', priority: 'low' },
-  { id: 8, title: 'Polish responsive design', description: 'Ensure mobile/desktop layouts work', status: 'todo', priority: 'low' },
-  { id: 9, title: 'Auto-generate task breakdown', description: 'AI-generated subtasks for complex features', status: 'todo', priority: 'high', isAI: true },
-  { id: 10, title: 'Smart priority sorting', description: 'AI-powered task prioritization based on deadlines', status: 'in-progress', priority: 'medium', isAI: true },
-  { id: 11, title: 'Automated code review', description: 'AI-generated code quality suggestions', status: 'review', priority: 'high', isAI: true },
-  { id: 12, title: 'Predictive timeline estimation', description: 'AI-generated sprint velocity predictions', status: 'done', priority: 'low', isAI: true },
+  { id: 1, title: 'Sample Task 1', description: 'This is a placeholder description.', status: 'todo', priority: 'medium' },
+  { id: 2, title: 'Sample Task 2', description: 'Task currently being worked on.', status: 'in-progress', priority: 'medium' },
+  { id: 3, title: 'Sample Task 3', description: 'Task awaiting review.', status: 'review', priority: 'medium' },
+  { id: 4, title: 'Sample Task 4', description: 'Completed sample task.', status: 'done', priority: 'low' },
 ];
 
-let nextId = 13;
+let nextId = 5;
 
 const normalizeString = (value, fallback = '') => typeof value === 'string' ? value.trim() : fallback;
 
