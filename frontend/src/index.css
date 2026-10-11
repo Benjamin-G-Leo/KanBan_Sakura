@@ -604,6 +604,8 @@ body {
   color: var(--task-description-color);
   font-weight: 400;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
   line-height: 1.5;
   margin: 0 0 var(--space-sm);
   display: -webkit-box;
@@ -612,9 +614,22 @@ body {
   overflow: hidden;
 }
 
+.task-description-layer {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
+  text-shadow: none;
+  filter: none;
+}
+
 :root[data-theme="light"] .task-description {
   color: #334155;
   text-shadow: none;
+}
+
+:root[data-theme="light"] .task-description-layer {
+  text-shadow: none;
+  filter: none;
 }
 
 .task-actions {

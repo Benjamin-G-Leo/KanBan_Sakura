@@ -77,7 +77,13 @@ export function TaskCard({ task, onUpdate, onDelete }) {
                   )}
                 </div>
               </div>
-              {task.description && <p className='task-description font-normal'>{task.description}</p>}
+              {task.description && (
+                <div className='task-description-layer'>
+                  <p className='task-description font-normal antialiased subpixel-antialiased transform translate-z-0'>
+                    {task.description}
+                  </p>
+                </div>
+              )}
               
               {hasSubtasks && (
                 <div className='subtasks-container' style={{ marginTop: 'var(--space-sm)' }}>
