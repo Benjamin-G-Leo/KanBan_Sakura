@@ -11,8 +11,8 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 - **Task CRUD**: Create, read, update, delete tasks via REST API
 - **Dark Mode**: Full Tailwind dark mode support with persistence
 - **Responsive**: Works on desktop and mobile
-- **🤖 AI Task Breakdown**: Click "✦ Breakdown" on any task to generate contextual subtasks (with glass shimmer loading overlay) and auto-spawn related AI tasks into To Do column
-- **🧠 Smart Suggestions**: Slide-out glassmorphic drawer analyzing board state for bottlenecks, idle columns, priority backlogs, and workflow insights
+- **AI Task Breakdown**: Click "✦ Breakdown" on any task to generate contextual subtasks (with glass shimmer loading overlay) and auto-spawn related AI tasks into To Do column
+- **Smart Suggestions**: Slide-out glassmorphic drawer analyzing board state for bottlenecks, idle columns, priority backlogs, and workflow insights
 
 ## Tech Stack
 
