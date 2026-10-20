@@ -30,7 +30,7 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 ## Project Structure
 
 ```
-tester/
+KanBan_Sakura/
 ├── backend/
 │   ├── server.js              # Express API entry point + in-memory task store
 │   ├── routes/

@@ -1,5 +1,5 @@
 {
-  "name": "tester",
+  "name": "kanban-sakura",
   "private": true,
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green \"PORT=3002 npm --prefix backend run dev\" \"VITE_API_URL=http://localhost:3002/api npm --prefix frontend run dev -- --host 0.0.0.0\"",
