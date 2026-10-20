@@ -1,6 +1,6 @@
 # AI-Powered Kanban Board
 
-A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node.js/Express. Features drag-and-drop task management across four columns with real-time API synchronization and **AI-powered task breakdown & smart suggestions**.
+A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node.js/Express. Features drag-and-drop task management across four columns with real-time API synchronization and **AI-powered task breakdown & smart suggestions** using your own OpenRouter API key.
 
 ## Features
 
@@ -10,19 +10,21 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 - **Priority System**: High (red), Medium (yellow), Low (green) indicators
 - **Task CRUD**: Create, read, update, delete tasks via REST API
 - **Dark Mode**: Full Tailwind dark mode support with persistence
+- **Animated Background**: Pixel-art canvas scene behind the board
 - **Responsive**: Works on desktop and mobile
-- **AI Task Breakdown**: Click "✦ Breakdown" on any task to generate contextual subtasks (with glass shimmer loading overlay) and auto-spawn related AI tasks into To Do column
-- **Smart Suggestions**: Slide-out glassmorphic drawer analyzing board state for bottlenecks, idle columns, priority backlogs, and workflow insights
+- **AI Mode** (toggle in the header, requires an OpenRouter key):
+  - **Task Breakdown**: Click "Breakdown" on any task to generate 3–5 subtasks (with a glass shimmer loading overlay)
+  - **Smart Suggestions**: "Open Insights" slide-out drawer with three workflow tips for bottlenecks, idle columns and priority backlogs
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, Vite, Tailwind CSS v4 |
+| Frontend | React 19, Vite 8, Tailwind CSS v4, oxlint |
 | Drag & Drop | @dnd-kit/core, @dnd-kit/sortable |
 | Backend | Node.js, Express, CORS |
 | State Management | React Context + useReducer (centralized) |
-| AI Endpoints | `/api/ai/breakdown`, `/api/ai/suggestions` |
+| AI | OpenRouter (`openrouter/free` model), bring-your-own key |
 | Deployment | Vercel (multi-service: backend + frontend) |
 
 ## Project Structure
@@ -30,29 +32,35 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 ```
 tester/
 ├── backend/
-│   ├── server.js              # Express API entry point
+│   ├── server.js              # Express API entry point + in-memory task store
 │   ├── routes/
 │   │   └── aiRoutes.js        # AI endpoints: /breakdown, /suggestions
+│   ├── services/
+│   │   └── aiService.js       # OpenRouter client
 │   └── package.json
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── KanbanBoard.jsx    # Main board + DnD context
-│   │   │   ├── Column.jsx         # Sortable column wrapper
-│   │   │   ├── TaskCard.jsx       # Task display + breakdown + subtasks
-│   │   │   ├── AddTaskForm.jsx    # Inline create form
-│   │   │   ├── AISuggestionsDrawer.jsx  # Smart suggestions panel
-│   │   │   └── constants.js       # Column config, API URL
+│   │   │   ├── KanbanBoard.jsx         # Main board + DnD context
+│   │   │   ├── Column.jsx              # Sortable column wrapper
+│   │   │   ├── TaskCard.jsx            # Task display + breakdown + subtasks
+│   │   │   ├── AddTaskForm.jsx         # Inline create form
+│   │   │   ├── SettingsModal.jsx       # OpenRouter API key settings
+│   │   │   ├── PixelArtBackground.jsx  # Animated canvas background
+│   │   │   └── constants.js            # Column config, API URL
 │   │   ├── context/
-│   │   │   └── KanbanContext.jsx  # Centralized state (useReducer)
+│   │   │   ├── KanbanContext.jsx       # Centralized state (useReducer)
+│   │   │   ├── KanbanContextValue.js   # Context object
+│   │   │   └── useKanban.js            # Hook for consuming the context
 │   │   ├── services/
 │   │   │   └── aiService.js       # API client for AI endpoints
-│   │   ├── App.jsx                # Providers + drawer integration
+│   │   ├── App.jsx                # Providers, header, suggestions drawer
 │   │   ├── main.jsx
 │   │   └── index.css              # Animations, shimmer, drawer styles
 │   ├── package.json
 │   ├── postcss.config.js
 │   └── vite.config.js
+├── package.json                 # Root scripts (runs both services)
 ├── vercel.json                  # Vercel multi-service config
 └── README.md
 ```
@@ -62,33 +70,27 @@ tester/
 ### Prerequisites
 - Node.js 18+
 - npm
+- An [OpenRouter](https://openrouter.ai) API key (optional — only needed for AI features)
 
-### Run Locally
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
-npm install
-npm run dev
-# Runs on http://localhost:3001
-```
-
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
-# Runs on http://localhost:5173 (or 5174 if 5173 in use)
-```
-
-Open the frontend URL in your browser.
-
-### Run with Concurrently (Single Terminal)
+### Run Locally (single terminal)
 ```bash
 npm install
+npm --prefix backend install
+npm --prefix frontend install
 npm run dev
-# Starts both backend (3001) and frontend (5173/5174)
+# Backend on http://localhost:3002, frontend on http://localhost:5173 (or 5174 if 5173 is in use)
 ```
+
+### Run services separately
+```bash
+npm run dev:backend    # backend on :3002
+npm run dev:frontend   # frontend, pointed at http://localhost:3002/api
+```
+
+Running `npm run dev` inside `backend/` directly uses port **3001**, which is also the frontend's default API URL when `VITE_API_URL` is not set.
+
+### Enable AI features
+Open the app, click the settings button, and paste your OpenRouter API key. The key is stored only in your browser's `localStorage` and sent with each AI request in the `x-user-api-key` header; the server never stores it. Then switch on **AI Mode**.
 
 ## API Endpoints
 
@@ -101,15 +103,19 @@ npm run dev
 | PATCH | `/api/tasks/:id` | Update task |
 | DELETE | `/api/tasks/:id` | Delete task |
 
-**Valid statuses:** `todo`, `in-progress`, `review`, `done`  
+**Valid statuses:** `todo`, `in-progress`, `review`, `done`
 **Valid priorities:** `low`, `medium`, `high`
+
+Tasks are kept in memory, so they reset whenever the backend restarts.
 
 ### AI Endpoints
 
+Both require the header `x-user-api-key: <your OpenRouter key>`; without it they return `401`.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/ai/breakdown` | Generate subtasks + standalone AI tasks `{taskId, title, description}` |
-| POST | `/api/ai/suggestions` | Analyze board state for workflow insights `{boardState}` |
+| POST | `/api/ai/breakdown` | Generate subtasks for a task `{taskId, title, description?}` |
+| POST | `/api/ai/suggestions` | Analyze board state for workflow tips `{boardState}` |
 
 #### `/api/ai/breakdown`
 
@@ -126,21 +132,12 @@ npm run dev
 ```json
 {
   "subtasks": [
-    "Create component architecture for ...",
-    "Implement responsive design patterns",
-    "Add accessibility (a11y) attributes",
-    "Write component unit tests"
-  ],
-  "standaloneTasks": [
-    {"text": "Refactor: Create Kanban board component", "isAI": true},
-    {"text": "Review: Create Kanban board component", "isAI": true}
+    "Define column and card component structure",
+    "Wire up drag-and-drop with @dnd-kit",
+    "Add responsive styling"
   ]
 }
 ```
-
-- **1.5s simulated latency** (replaceable with real LLM call)
-- **Context-aware templates**: database, auth, UI, API-specific subtasks
-- **`standaloneTasks`** auto-spawn as new cards in To Do with `isAI: true`
 
 #### `/api/ai/suggestions`
 
@@ -149,59 +146,43 @@ npm run dev
 {
   "boardState": {
     "columns": {"todo": 5, "in-progress": 0, "review": 3, "done": 2},
-    "tasks": [{...}]
+    "tasks": []
   }
 }
 ```
 
-**Response:**
+**Response:** three suggestions. If the model's reply can't be parsed, the backend falls back to built-in rules (To Do > 4, In Progress > 3, Review > 3, empty In Progress, high-priority backlog, column imbalance).
 ```json
-[
-  {
-    "id": "suggestion-...",
-    "title": "To Do Column Bottleneck",
-    "priority": "high",
-    "recommendation": "AI Suggestion: 'To Do' has 5 tasks (threshold: 4). Consider prioritizing or breaking down large tasks to restore column flow."
-  },
-  {
-    "id": "suggestion-...",
-    "title": "In Progress Idle",
-    "priority": "medium",
-    "recommendation": "AI Suggestion: 'In Progress' is empty while To Do has work. Pull the highest-priority task to maintain flow."
-  }
-]
+{
+  "suggestions": [
+    "Pull the highest-priority To Do task into In Progress to restore flow.",
+    "Review has 3 tasks waiting — clear reviews before starting new work.",
+    "Break large To Do items into smaller tasks."
+  ]
+}
 ```
-
-- **1s simulated latency** (replaceable with real LLM call)
-- **Detects**: To Do >4, In Progress >3, Review >3, empty In Progress, high-priority backlog, AI tasks pending, column imbalance (>50%)
-- Returns top 3 most relevant suggestions
 
 ### Example API Usage
 
 ```bash
 # Create task
-curl -X POST http://localhost:3001/api/tasks \
+curl -X POST http://localhost:3002/api/tasks \
   -H "Content-Type: application/json" \
   -d '{"title":"New feature","status":"todo","priority":"high"}'
 
 # Trigger AI breakdown
-curl -X POST http://localhost:3001/api/ai/breakdown \
+curl -X POST http://localhost:3002/api/ai/breakdown \
   -H "Content-Type: application/json" \
+  -H "x-user-api-key: $OPENROUTER_API_KEY" \
   -d '{"taskId":4,"title":"Design database schema","description":"Create tables"}'
-
-# Get AI suggestions
-curl -X POST http://localhost:3001/api/ai/suggestions \
-  -H "Content-Type: application/json" \
-  -d '{"boardState":{"columns":{"todo":5,"in-progress":0,"review":3,"done":2},"tasks":[]}}'
 ```
 
 ## Development
 
-### Frontend Build
+### Frontend Build & Lint
 ```bash
-cd frontend
-npm run build
-# Outputs to dist/
+npm run build                    # outputs to frontend/dist/
+npm --prefix frontend run lint   # oxlint
 ```
 
 ### Backend Validation
@@ -217,7 +198,7 @@ This project is configured for **Vercel multi-service deployment** via `vercel.j
 - **`backend` service**: Express API, exposed through the `/api/*` rewrite
 - **`frontend` service**: Vite SPA, exposed through the catch-all `/*` rewrite
 
-The frontend calls the backend from the browser using the same-origin `/api` path. The backend does not make server-to-server calls, so no Vercel service binding is needed. The frontend's `VITE_API_URL` is set to `/api` in its Vercel build and development commands.
+The frontend calls the backend from the browser using the same-origin `/api` path. The backend does not make server-to-server calls, so no Vercel service binding is needed. The frontend's `VITE_API_URL` is set to `/api` in its Vercel build and development commands. No server-side API keys are needed.
 
 ### Deploy
 ```bash
@@ -238,6 +219,7 @@ vercel dev -L
 - ✅ **Phase 2**: Core State & Kanban - 4 columns, drag-drop, API sync, dark mode
 - ✅ **Phase 3**: AI Integration - Task breakdown, smart suggestions, centralized state
 - ✅ **Phase 4**: DevOps - Vercel multi-service config, CI/CD ready
+- ✅ **Phase 5**: Bring-your-own OpenRouter key, AI mode toggle, pixel-art background
 
 ## License
 
