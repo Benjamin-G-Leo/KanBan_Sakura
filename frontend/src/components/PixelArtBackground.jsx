@@ -541,89 +541,114 @@ function drawRipples(ctx, width, riverTop, riverHeight, block, time) {
   ctx.restore();
 }
 
+// Greens from deepest shade to sunlit tips; night is darker and cooler
 const BUSH_PALETTES = {
   dark: {
-    outline: '#0f2a20', shadow: '#1f513e', base: '#2d6a4f', light: '#40916c', highlight: '#6fbf95',
-    flower: '#f09db8', ground: 'rgba(40, 24, 18, 0.28)',
+    tones: ['#0b1c12', '#12301d', '#1b4428', '#265a32', '#357040', '#5b8f52'],
+    flower: '#f09db8',
+    ground: 'rgba(40, 24, 18, 0.3)',
   },
   light: {
-    outline: '#1b4332', shadow: '#2d6a4f', base: '#40916c', light: '#52b788', highlight: '#95d5b2',
-    flower: '#ff8da1', ground: 'rgba(120, 84, 52, 0.22)',
+    tones: ['#1c3a18', '#2a5420', '#3a7026', '#538d2c', '#7eb03a', '#bcdc68'],
+    flower: '#ff8da1',
+    ground: 'rgba(120, 84, 52, 0.24)',
   },
 };
 
-// Each bush is a cluster of 3-4 round clumps rasterised onto a pixel grid:
-// outlined, shaded from the top-left with a little dithering between tones,
-// sitting on a soft ground shadow, with a few blossoms on some of them.
-function drawBushes(ctx, width, height, theme) {
+// Bushes are dense foliage: tiers of leaf clumps, each lit from above so its
+// top is speckled with bright leaves and its underside falls into deep shade.
+// Clumps are painted back (top) to front (bottom), so each clump's sunlit top
+// sits against the shaded underside of the one behind it. Edges are ragged
+// with stray leaves, and there is no hard outline.
+function buildBush(seed, cols, rows) {
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(-1));
+  const noise = (gx, gy, salt) => seeded(seed * 3.1 + gx * 12.7 + gy * 71.3 + salt);
+
+  const clumps = [];
+  const addTier = (count, from, to, cyFrac, rMin, rMax) => {
+    for (let i = 0; i < count; i += 1) {
+      const t = count === 1 ? 0.5 : i / (count - 1);
+      const jitter = (seeded(seed + clumps.length * 7) - 0.5) * 0.08;
+      const r = rows * (rMin + seeded(seed + clumps.length * 11) * (rMax - rMin));
+      // Keep clumps inside the grid so the sides round off instead of clipping flat
+      const cx = Math.min(cols - r * 1.15 - 1, Math.max(r * 1.15 + 1, cols * (from + (to - from) * t + jitter)));
+      clumps.push({
+        cx,
+        cy: rows * cyFrac + (seeded(seed + clumps.length * 13) - 0.5) * rows * 0.08,
+        r,
+      });
+    }
+  };
+  const base = Math.max(3, Math.round(cols / 8));
+  addTier(1 + Math.floor(seeded(seed + 1) * 2), 0.38, 0.62, 0.3, 0.26, 0.32);
+  addTier(base - 1, 0.2, 0.8, 0.52, 0.28, 0.34);
+  addTier(base, 0.12, 0.88, 0.74, 0.3, 0.36);
+  // Higher clumps are further back, so paint them first
+  clumps.sort((a, b) => a.cy - b.cy);
+
+  clumps.forEach((clump, index) => {
+    for (let gy = 0; gy < rows; gy += 1) {
+      for (let gx = 0; gx < cols; gx += 1) {
+        const dx = (gx + 0.5 - clump.cx) / clump.r;
+        const dy = (gy + 0.5 - clump.cy) / clump.r;
+        const dist = Math.hypot(dx, dy);
+        // Ragged leafy edge: tops may sprout past the circle, sides break up
+        const reach = 1 + (noise(gx, gy, index) - 0.5) * 0.4 + (dy < -0.4 ? 0.12 : 0);
+        if (dist > reach || gy >= rows) continue;
+        const lit = -dy * 0.85 - dx * 0.3 - dist * dist * 0.35 - (gy / rows) * 0.35;
+        const speckle = (noise(gx, gy, index + 50) - 0.5) * 0.7;
+        const value = lit + speckle;
+        const tone = value > 0.55 ? 5 : value > 0.25 ? 4 : value > -0.05 ? 3 : value > -0.35 ? 2 : value > -0.7 ? 1 : 0;
+        grid[gy][gx] = tone;
+      }
+    }
+  });
+
+  // Stray leaves just above the upper edge
+  for (let gy = 1; gy < rows * 0.6; gy += 1) {
+    for (let gx = 1; gx < cols - 1; gx += 1) {
+      if (grid[gy][gx] === -1 && grid[gy + 1][gx] >= 3 && noise(gx, gy, 99) > 0.78) {
+        grid[gy][gx] = noise(gx, gy, 98) > 0.5 ? 5 : 4;
+      }
+    }
+  }
+  return grid;
+}
+
+function renderBushLayer(width, height, theme, ratio) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
   const palette = BUSH_PALETTES[theme === 'dark' ? 'dark' : 'light'];
   const block = Math.max(3, Math.round(width / 170));
-  const cell = Math.max(3, Math.round(width / 240));
+  const cell = Math.max(2, Math.round(width / 360));
   const shoreY = height * 0.69;
   const positions = [0.16, 0.29, 0.48, 0.76, 0.88];
 
   positions.forEach((position, index) => {
     const seed = index * 31 + 7;
-    const cols = 10 + Math.floor(seeded(seed) * 4);
-    const rows = 6 + Math.floor(seeded(seed + 1) * 2);
+    const cols = 30 + Math.floor(seeded(seed) * 9);
+    const rows = 15 + Math.floor(seeded(seed + 2) * 4);
+    const grid = buildBush(seed, cols, rows);
     const left = Math.round((position * width) / cell) * cell - Math.round(cols / 2) * cell;
     const bottom = Math.round((shoreY + Math.sin(index * 2.7) * block) / cell) * cell;
     const top = bottom - rows * cell;
 
-    // Clumps in cell units: a wide flat base so the bottom is always solid, two
-    // shoulders, and one or two rounded crowns on top
-    const clumps = [
-      { cx: cols * 0.5, cy: rows - 0.5, r: cols * 0.47, squash: 2.2 },
-      { cx: cols * 0.28, cy: rows * 0.68, r: rows * 0.42, squash: 1 },
-      { cx: cols * 0.72, cy: rows * 0.7, r: rows * 0.4, squash: 1 },
-      { cx: cols * (0.42 + seeded(seed + 2) * 0.16), cy: rows * 0.45, r: rows * 0.45, squash: 1 },
-    ];
-    if (seeded(seed + 3) > 0.45) {
-      clumps.push({ cx: cols * (0.6 + seeded(seed + 4) * 0.12), cy: rows * 0.42, r: rows * 0.34, squash: 1 });
-    }
-
-    const nearestClump = (gx, gy) => {
-      let best = null;
-      clumps.forEach((clump) => {
-        const dist = Math.hypot(gx + 0.5 - clump.cx, (gy + 0.5 - clump.cy) * clump.squash) / clump.r;
-        if (dist <= 1 && (!best || dist < best.dist)) best = { clump, dist };
-      });
-      return best?.clump ?? null;
-    };
-
-    // Mask, then drop lone bumps (cells with no side neighbours) so tops stay round
-    const mask = Array.from({ length: rows }, (_, gy) => (
-      Array.from({ length: cols }, (_, gx) => nearestClump(gx, gy))
-    ));
-    for (let gy = 0; gy < rows - 1; gy += 1) {
-      for (let gx = 0; gx < cols; gx += 1) {
-        if (mask[gy][gx] && !mask[gy][gx - 1] && !mask[gy][gx + 1]) mask[gy][gx] = null;
-      }
-    }
-    const clumpAt = (gx, gy) => (gy >= 0 && gy < rows ? mask[gy][gx] ?? null : null);
-
     ctx.fillStyle = palette.ground;
-    ctx.fillRect(left, bottom, cols * cell, cell);
+    ctx.fillRect(left + cell * 2, bottom, (cols - 4) * cell, cell);
+    ctx.fillRect(left + cell * 5, bottom + cell, (cols - 10) * cell, cell);
 
     for (let gy = 0; gy < rows; gy += 1) {
       for (let gx = 0; gx < cols; gx += 1) {
-        const clump = clumpAt(gx, gy);
-        if (!clump) continue;
-        const edge = !clumpAt(gx - 1, gy) || !clumpAt(gx + 1, gy) || !clumpAt(gx, gy - 1)
-          || (gy < rows - 1 && !clumpAt(gx, gy + 1));
-        let color = palette.outline;
-        if (!edge) {
-          const nx = (gx + 0.5 - clump.cx) / clump.r;
-          const ny = (gy + 0.5 - clump.cy) / clump.r;
-          const dither = (gx + gy) % 2 === 0 ? 0.08 : -0.08;
-          const lightness = -(nx * 0.55 + ny * 0.85) + dither;
-          color = lightness > 0.55 ? palette.highlight
-            : lightness > 0.15 ? palette.light
-              : lightness > -0.35 ? palette.base
-                : palette.shadow;
-        }
-        ctx.fillStyle = color;
-        ctx.fillRect(left + gx * cell, top + gy * cell, cell, cell);
+        const tone = grid[gy][gx];
+        if (tone < 0) continue;
+        ctx.fillStyle = palette.tones[tone];
+        // 1px overlap avoids seams at fractional pixel ratios
+        ctx.fillRect(left + gx * cell, top + gy * cell, cell + 0.5, cell + 0.5);
       }
     }
 
@@ -631,14 +656,28 @@ function drawBushes(ctx, width, height, theme) {
       ctx.fillStyle = palette.flower;
       const flowers = 2 + Math.floor(seeded(seed + 6) * 3);
       for (let f = 0; f < flowers; f += 1) {
-        const gx = 1 + Math.floor(seeded(seed + 10 + f) * (cols - 2));
-        const gy = 1 + Math.floor(seeded(seed + 20 + f) * (rows - 3));
-        if (clumpAt(gx, gy) && clumpAt(gx, gy - 1)) {
-          ctx.fillRect(left + gx * cell, top + gy * cell, cell, cell);
-        }
+        const gx = 2 + Math.floor(seeded(seed + 40 + f) * (cols - 4));
+        const gy = 2 + Math.floor(seeded(seed + 50 + f) * (rows * 0.6));
+        if (grid[gy][gx] >= 3) ctx.fillRect(left + gx * cell, top + gy * cell, cell, cell);
       }
     }
   });
+  return canvas;
+}
+
+// Bushes are static, so each theme/size is rendered once and reused per frame
+const bushLayers = new Map();
+
+function drawBushes(ctx, width, height, theme) {
+  const ratio = ctx.getTransform().a || 1;
+  const key = `${theme}:${Math.round(width)}x${Math.round(height)}@${ratio}`;
+  let layer = bushLayers.get(key);
+  if (!layer) {
+    if (bushLayers.size > 4) bushLayers.clear();
+    layer = renderBushLayer(width, height, theme, ratio);
+    bushLayers.set(key, layer);
+  }
+  ctx.drawImage(layer, 0, 0, width, height);
 }
 
 function mixColor(from, to, progress) {
