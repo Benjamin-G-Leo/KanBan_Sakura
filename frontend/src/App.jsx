@@ -170,7 +170,8 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      {/* Top padding leaves a band of sky clear so the sun and moon stay visible */}
+      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-6 pt-[clamp(1.5rem,14vh,9rem)] sm:px-6 lg:px-8">
         <KanbanBoard />
       </main>
 

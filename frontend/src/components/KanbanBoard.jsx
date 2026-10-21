@@ -30,7 +30,7 @@ export function KanbanBoard() {
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-8 overflow-x-auto pb-4">
         {COLUMNS.map((column) => (
           <Column
             key={column.id}
