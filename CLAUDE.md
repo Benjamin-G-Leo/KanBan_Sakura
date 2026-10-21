@@ -20,7 +20,7 @@ No test suite. Note: the root scripts use port **3002**; running `backend` direc
 
 **Backend (`backend/`, ESM, Express 4)**
 - `server.js` — task CRUD at `/api/tasks` (GET, POST, PATCH `/:id`, DELETE `/:id`) plus `GET /api/tasks/expired?since=`. Validates status (`todo`, `in-progress`, `review`, `done`) and priority (`low`, `medium`, `high`); 400 on bad input, 404 on missing task.
-- Lifecycle: POST always creates in `todo`; PATCH only allows a one-stage status move. Entering `done` sets server-owned `completedAt`; Done tasks older than `DONE_TTL_MS` (default 24h) are purged lazily by middleware on every `/api/tasks` request and logged for the `/expired` endpoint. Don't replace this with timers — serverless instances don't keep them alive.
+- Lifecycle: POST creates in any stage except `done` (default `todo`); PATCH only allows a one-stage status move. Entering `done` sets server-owned `completedAt`; Done tasks older than `DONE_TTL_MS` (default 24h) are purged lazily by middleware on every `/api/tasks` request and logged for the `/expired` endpoint. Don't replace this with timers — serverless instances don't keep them alive.
 - Tasks are an **in-memory array** — they reset on every restart, and on Vercel each serverless instance has its own copy. There is no database.
 - `routes/aiRoutes.js` — `POST /api/ai/breakdown`, `POST /api/ai/suggestions`. Middleware `requireUserApiKey` reads the key from the `x-user-api-key` header and returns 401 if missing.
 - `services/aiService.js` — `callOpenRouter` / `buildCompletionRequest` (model `openrouter/free`, JSON-only system prompt).

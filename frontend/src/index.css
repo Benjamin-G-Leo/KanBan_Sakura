@@ -76,8 +76,7 @@
   --header-eyebrow: #6ee7b7;
   --smart-sort-color: #fcd34d;
   --column-header-bg: rgba(9, 13, 22, 0.75);
-  --add-task-bg: #38bdf8;
-  --add-task-bg-hover: #7dd3fc;
+  --add-task-hover-mix: #ffffff;
   --add-task-fg: #0b1220;
 
   --ai-glow-primary: rgba(16, 185, 129, 0.15);
@@ -196,8 +195,7 @@
   --header-eyebrow: #047857;
   --smart-sort-color: #b45309;
   --column-header-bg: rgba(255, 255, 255, 0.85);
-  --add-task-bg: #0369a1;
-  --add-task-bg-hover: #075985;
+  --add-task-hover-mix: #000000;
   --add-task-fg: #ffffff;
 
   color-scheme: light;
@@ -494,6 +492,16 @@ body {
 [data-stage="in-progress"] { --stage: var(--stage-in-progress); --stage-text: var(--stage-in-progress-text); }
 [data-stage="review"] { --stage: var(--stage-review); --stage-text: var(--stage-review-text); }
 [data-stage="done"] { --stage: var(--stage-done); --stage-text: var(--stage-done-text); }
+
+/* Add Task takes its column's stage colour: bright fill in dark mode, deep fill in light */
+.kanban-column[data-stage] {
+  --add-task-bg: var(--stage);
+  --add-task-bg-hover: color-mix(in srgb, var(--add-task-bg) 78%, var(--add-task-hover-mix));
+}
+
+:root[data-theme="light"] .kanban-column[data-stage] {
+  --add-task-bg: var(--stage-text);
+}
 
 .column-header {
   display: flex;

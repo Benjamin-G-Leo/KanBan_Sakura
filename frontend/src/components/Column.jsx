@@ -33,7 +33,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
           ))}
         </div>
       </SortableContext>
-      {columnId === 'todo' && <AddTaskForm onAdd={onTaskAdd} />}
+      {columnId !== 'done' && <AddTaskForm columnId={columnId} onAdd={onTaskAdd} />}
     </div>
   );
 }

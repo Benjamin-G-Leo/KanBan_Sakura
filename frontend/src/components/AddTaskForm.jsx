@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { API_URL } from './constants';
 
-export function AddTaskForm({ onAdd }) {
+export function AddTaskForm({ columnId, onAdd }) {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -15,9 +15,10 @@ export function AddTaskForm({ onAdd }) {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description, status: 'todo', priority }),
+        body: JSON.stringify({ title, description, status: columnId, priority }),
       });
       const task = await res.json();
+      if (!res.ok) throw new Error(task.error || res.status);
       onAdd(task);
       setTitle('');
       setDescription('');

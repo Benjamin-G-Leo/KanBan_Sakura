@@ -5,7 +5,7 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 ## Features
 
 - **4-Column Layout**: To Do → In Progress → Review → Done, each with its own stage colour (sky, amber, violet, emerald)
-- **Controlled Lifecycle**: Tasks are created in To Do only and move one stage at a time, forward or back, via the card's `←` / `Next →` buttons or drag-and-drop (@dnd-kit). Drags that skip a stage are rejected.
+- **Controlled Lifecycle**: Tasks can be added in To Do, In Progress or Review (never straight into Done) and move one stage at a time, forward or back, via the card's `←` / `Next →` buttons or drag-and-drop (@dnd-kit). Drags that skip a stage are rejected.
 - **Done Auto-Clear**: Tasks are removed 24 hours after entering Done, with an in-app toast (tasks cleared while the app was closed are reported on next load)
 - **Inline Editing**: Click to edit task title and description
 - **Priority Pills**: High / Med / Low tag on each card
@@ -45,7 +45,7 @@ KanBan_Sakura/
 │   │   │   ├── KanbanBoard.jsx         # Main board + DnD context
 │   │   │   ├── Column.jsx              # Sortable column wrapper
 │   │   │   ├── TaskCard.jsx            # Task display, stage moves, breakdown + subtasks
-│   │   │   ├── AddTaskForm.jsx         # Inline create form (To Do column only)
+│   │   │   ├── AddTaskForm.jsx         # Inline create form (every column except Done)
 │   │   │   ├── Toasts.jsx              # In-app notifications (e.g. Done auto-clear)
 │   │   │   ├── SettingsModal.jsx       # OpenRouter API key settings
 │   │   │   ├── PixelArtBackground.jsx  # Animated canvas background
@@ -101,7 +101,7 @@ Open the app, click the settings button, and paste your OpenRouter API key. The 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/tasks` | List all tasks |
-| POST | `/api/tasks` | Create task `{title, description?, priority?, isAI?}` — always created in `todo` |
+| POST | `/api/tasks` | Create task `{title, description?, status?, priority?, isAI?}` — `status` defaults to `todo`; `done` is rejected |
 | PATCH | `/api/tasks/:id` | Update task; `status` may only move one stage forward or back |
 | DELETE | `/api/tasks/:id` | Delete task |
 | GET | `/api/tasks/expired?since=<ms>` | Tasks auto-cleared from Done since `since`: `{now, ttlMs, expired: [{id, title, expiredAt}]}` |

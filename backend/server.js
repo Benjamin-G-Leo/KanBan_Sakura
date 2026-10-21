@@ -100,13 +100,16 @@ app.post('/api/tasks', (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
-  const { title, description = '', priority = 'medium', isAI = false } = validation.value;
+  const { title, description = '', status = 'todo', priority = 'medium', isAI = false } = validation.value;
+  // Tasks can start in any stage except Done; they must be completed to get there
+  if (status === 'done') {
+    return res.status(400).json({ error: 'Tasks cannot be created in Done' });
+  }
   const task = {
     id: nextId++,
     title: normalizeString(title),
     description: normalizeString(description, ''),
-    // New tasks always start the lifecycle in To Do
-    status: 'todo',
+    status,
     priority: VALID_PRIORITIES.includes(priority) ? priority : 'medium',
     isAI: Boolean(isAI),
   };
