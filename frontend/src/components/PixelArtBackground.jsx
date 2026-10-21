@@ -394,32 +394,72 @@ function drawWater(ctx, width, height, theme, time) {
 
   const riverTop = height * 0.76;
   const shoreTop = height * 0.62;
+  drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time);
+  ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
+  drawRipples(ctx, width, riverTop, height - riverTop, block, time);
+}
+
+// Layered sines give an irregular but smooth, non-repeating-looking edge (-1..1)
+function coastNoise(x, phase) {
+  return (
+    Math.sin(x * 0.011 + phase) * 0.55
+    + Math.sin(x * 0.027 + phase * 2.3) * 0.3
+    + Math.sin(x * 0.067 + phase * 0.7) * 0.15
+  );
+}
+
+// Sand bank and waterline, drawn in pixel columns so the edges stay chunky like
+// the rest of the scene: dry sand with scattered pebbles, a darker band of wet
+// sand, the water itself, a shade line under the bank, and broken foam that
+// pulses gently as if lapping at the shore.
+function drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time) {
+  const step = Math.max(3, Math.round(block / 2));
+  const snap = (value) => Math.round(value / step) * step;
+  const sceneAlpha = ctx.globalAlpha;
+  const columns = [];
+  for (let x = 0; x < width + step; x += step) {
+    const top = snap(shoreTop + Math.sin(x * 0.014) * block * 0.7);
+    const water = snap(riverTop + coastNoise(x, 1.8) * block);
+    const wet = water - Math.max(step, snap(block * (1.1 + 0.6 * coastNoise(x, 4.2))));
+    columns.push({ x, top, water, wet });
+  }
+
   ctx.fillStyle = dark ? '#b58a68' : '#e2c9a1';
-  ctx.beginPath();
-  ctx.moveTo(0, shoreTop);
-  for (let x = 0; x <= width; x += block * 2) {
-    const y = shoreTop + Math.sin(x * 0.014) * block * 0.7;
-    ctx.lineTo(x, y);
-  }
-  for (let x = width; x >= 0; x -= block * 2) {
-    const y = riverTop + Math.sin(x * 0.011 + 1.8) * block * 0.7;
-    ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = dark ? '#80604f' : '#b5936b';
-  for (let x = block; x < width; x += block * 7) {
-    const y = shoreTop + block * (2 + ((x / block) % 4));
-    ctx.fillRect(x, y, block * 2, Math.max(2, block / 2));
-    ctx.fillRect(x + block * 3, y + block * 2, block, Math.max(2, block / 3));
+  columns.forEach(({ x, top, water }) => ctx.fillRect(x, top, step, water - top));
+  ctx.fillStyle = dark ? '#8f6b54' : '#cfae84';
+  columns.forEach(({ x, wet, water }) => ctx.fillRect(x, wet, step, water - wet));
+
+  // Pebbles and glints scattered on the dry sand
+  const speckles = Math.floor(width / (block * 2.2));
+  for (let k = 0; k < speckles; k += 1) {
+    const column = columns[Math.floor(seeded(k * 3 + 1) * (columns.length - 1))];
+    const span = column.wet - column.top - step * 3;
+    if (span <= 0) continue;
+    const y = snap(column.top + step * 2 + seeded(k * 3 + 2) * span);
+    const glint = seeded(k * 3 + 3) > 0.72;
+    ctx.fillStyle = glint ? (dark ? '#cfa784' : '#f3e2c3') : (dark ? '#80604f' : '#b5936b');
+    ctx.fillRect(column.x, y, step * (glint ? 1 : 1 + Math.floor(seeded(k * 7) * 3)), step);
   }
 
   ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
-  ctx.fillRect(0, riverTop, width, height - riverTop);
-  ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
-  drawRipples(ctx, width, riverTop, height - riverTop, block, time);
-  ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
-  ctx.fillRect(0, riverTop - block, width, block * 2);
+  columns.forEach(({ x, water }) => ctx.fillRect(x, water, step, height - water));
+  ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.55)' : 'rgba(71, 108, 128, 0.22)';
+  columns.forEach(({ x, water }) => ctx.fillRect(x, water, step, step * 2));
+
+  // Two broken foam lines that fade in and out along the shore
+  ctx.save();
+  ctx.fillStyle = dark ? 'rgb(196, 228, 236)' : 'rgb(255, 255, 255)';
+  columns.forEach(({ x, water }, index) => {
+    if (seeded(index * 5 + 1) > 0.25) {
+      ctx.globalAlpha = sceneAlpha * (0.25 + 0.3 * (1 + Math.sin(time * 0.0016 + x * 0.021)) / 2);
+      ctx.fillRect(x, water, step, step);
+    }
+    if (seeded(index * 5 + 2) > 0.6) {
+      ctx.globalAlpha = sceneAlpha * 0.25 * (1 + Math.sin(time * 0.0016 + x * 0.021 - 1.6)) / 2;
+      ctx.fillRect(x, water + step * 2, step, step);
+    }
+  });
+  ctx.restore();
 }
 
 // Deterministic 0..1 noise so ripples need no per-frame state
