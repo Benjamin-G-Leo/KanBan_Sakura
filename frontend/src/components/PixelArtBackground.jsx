@@ -486,6 +486,19 @@ function drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time) {
       ctx.fillRect(x, water + step * 2, step, step);
     }
   });
+
+  // The same pulsing foam glints scattered across the open river, each with its
+  // own phase and speed so they shimmer independently
+  const glintTop = Math.max(...columns.map(({ water }) => water)) + step * 4;
+  const glintSpan = height - glintTop - step;
+  const glints = Math.floor(width / (block * 1.6));
+  for (let k = 0; k < glints && glintSpan > 0; k += 1) {
+    const x = snap(seeded(k * 4 + 201) * width);
+    const y = snap(glintTop + seeded(k * 4 + 202) * glintSpan);
+    const pulse = (1 + Math.sin(time * (0.0011 + seeded(k * 4 + 203) * 0.0012) + k * 2.4)) / 2;
+    ctx.globalAlpha = sceneAlpha * 0.4 * pulse * pulse;
+    ctx.fillRect(x, y, step * (1 + Math.floor(seeded(k * 4 + 204) * 3)), step);
+  }
   ctx.restore();
 }
 
