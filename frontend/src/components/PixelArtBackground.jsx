@@ -73,10 +73,10 @@ function drawTaperedOrganicStroke(ctx, points, color, startWidth, endWidth) {
   }
 }
 
-function drawBezierStroke(ctx, start, controls, end, color, width) {
+function drawBezierStroke(ctx, start, controls, end, color, width, cap = 'square') {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
-  ctx.lineCap = 'square';
+  ctx.lineCap = cap;
   ctx.lineJoin = 'round';
   ctx.beginPath();
   ctx.moveTo(start[0], start[1]);
@@ -121,6 +121,59 @@ function drawCanopy(ctx, centerX, centerY, unit, colors, seed, layer = 'all') {
   }
 }
 
+// Trunk base and roots, in chunky cells to match the pixel-art scene: the
+// trunk flares out towards the ground, and roots of uneven length taper and
+// slope down into the sand, each with a lit top edge and a dark outline.
+function drawRoots(ctx, centerX, groundLevel, unit, baseWidth, wood, seed, dark) {
+  const cell = Math.max(2, Math.round(unit));
+  const snap = (value) => Math.round(value / cell) * cell;
+  const groundY = snap(groundLevel);
+
+  ctx.fillStyle = dark ? 'rgba(20, 12, 16, 0.35)' : 'rgba(90, 60, 40, 0.22)';
+  ctx.fillRect(snap(centerX - baseWidth * 1.7), groundY, snap(baseWidth * 3.4), cell);
+  ctx.fillRect(snap(centerX - baseWidth * 1.1), groundY + cell, snap(baseWidth * 2.2), cell);
+
+  const roots = [
+    { dir: -1, length: 11, thick: 3, slope: 0.28, from: 0.9 },
+    { dir: 1, length: 10, thick: 3, slope: 0.3, from: 0.9 },
+    { dir: -1, length: 5, thick: 2, slope: 0.55, from: 0.4 },
+    { dir: 1, length: 6, thick: 2, slope: 0.5, from: 0.45 },
+  ];
+  roots.forEach((root, r) => {
+    const length = root.length + Math.floor(seeded(seed * 7 + r) * 4);
+    const startX = centerX + root.dir * (baseWidth / 2) * root.from;
+    for (let i = 0; i < length; i += 1) {
+      const progress = i / length;
+      const thick = Math.max(1, Math.round(root.thick * (1 - progress * 0.75)));
+      const x = snap(startX + root.dir * i * cell);
+      const top = snap(groundY - thick * cell + i * cell * root.slope * 0.5);
+      ctx.fillStyle = wood.outline;
+      ctx.fillRect(x, top - cell, cell, (thick + 1) * cell);
+      if (i < length - 1) {
+        ctx.fillStyle = wood.trunk;
+        ctx.fillRect(x, top, cell, thick * cell);
+        ctx.fillStyle = wood.woodLight;
+        ctx.fillRect(x, top, cell, cell);
+      }
+    }
+  });
+
+  // Flare: rows widening towards the ground, drawn over the root starts
+  const flareRows = 5;
+  for (let k = 0; k < flareRows; k += 1) {
+    const y = groundY - (flareRows - k) * cell;
+    const half = baseWidth / 2 + cell * k * k * 0.22;
+    const left = snap(centerX - half);
+    const right = snap(centerX + half);
+    ctx.fillStyle = wood.outline;
+    ctx.fillRect(left - cell, y, right - left + cell * 2, cell);
+    ctx.fillStyle = wood.trunk;
+    ctx.fillRect(left, y, right - left, cell);
+    ctx.fillStyle = wood.woodLight;
+    ctx.fillRect(left + cell, y, cell, cell);
+  }
+}
+
 function drawTree(ctx, width, height, tree, theme, time, index) {
   const dark = theme === 'dark';
   const unit = Math.max(2, PIXEL * tree.scale);
@@ -140,12 +193,10 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
 
   ctx.save();
   ctx.globalAlpha *= tree.depth === 'back' ? 0.62 : 1;
-  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, outline, baseWidth + unit * 2);
-  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, trunk, baseWidth);
-  drawBezierStroke(ctx, [centerX, bankY + unit * 2], trunkControls, trunkTop, woodLight, Math.max(2, unit));
-
-  ctx.fillStyle = outline;
-  ctx.fillRect(centerX - baseWidth * 0.9, bankY - unit, baseWidth * 1.8, unit * 3);
+  const trunkBase = [centerX, bankY + unit * 1.5];
+  drawBezierStroke(ctx, trunkBase, trunkControls, trunkTop, outline, baseWidth + unit * 2, 'butt');
+  drawBezierStroke(ctx, trunkBase, trunkControls, trunkTop, trunk, baseWidth, 'butt');
+  drawBezierStroke(ctx, trunkBase, trunkControls, trunkTop, woodLight, Math.max(2, unit), 'butt');
 
   const primaryBranches = [
     { direction: -1, reach: 26, lift: 13, bend: -2, offset: -1 },
@@ -241,14 +292,7 @@ function drawTree(ctx, width, height, tree, theme, time, index) {
     drawTaperedOrganicStroke(ctx, points, trunk, startWidth, unit * 0.55);
     drawTaperedOrganicStroke(ctx, points, woodLight, unit * 0.55, Math.max(1, unit * 0.2));
   });
-  const roots = [
-    [[centerX, bankY], [centerX - unit * 7, bankY + unit], [centerX - unit * 14, bankY + unit * 2]],
-    [[centerX, bankY], [centerX + unit * 6, bankY + unit], [centerX + unit * 13, bankY + unit * 2]],
-  ];
-  roots.forEach((root) => {
-    drawOrganicStroke(ctx, root, outline, unit * 2.4);
-    drawOrganicStroke(ctx, root, trunk, unit * 1.5);
-  });
+  drawRoots(ctx, centerX, bankY + unit * 1.5, unit, baseWidth, { outline, trunk, woodLight }, index, dark);
 
   // Layer 2: build one continuous, overlapping inner canopy over every branch joint.
   for (let row = -8; row <= 12; row += 2) {
@@ -637,7 +681,9 @@ function renderBushLayer(width, height, theme, ratio) {
   const block = Math.max(3, Math.round(width / 170));
   const cell = Math.max(3, Math.round(width / 240));
   const shoreY = height * 0.69;
-  const positions = [0.16, 0.29, 0.48, 0.76, 0.88];
+  // In the open sand between trunks (trees at 0.08, 0.34, 0.68, 0.94) so no
+  // bush hides a tree base or sits behind one
+  const positions = [0.2, 0.44, 0.58, 0.81];
 
   positions.forEach((position, index) => {
     const seed = index * 31 + 7;
