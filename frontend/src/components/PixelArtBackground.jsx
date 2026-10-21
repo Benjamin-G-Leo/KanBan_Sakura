@@ -446,6 +446,17 @@ function drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time) {
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.55)' : 'rgba(71, 108, 128, 0.22)';
   columns.forEach(({ x, water }) => ctx.fillRect(x, water, step, step * 2));
 
+  // Shallows: the same short dashes as the sand texture, in water tones, in a
+  // band just off the shore
+  const shallowDashes = Math.floor(width / (block * 2.6));
+  for (let k = 0; k < shallowDashes; k += 1) {
+    const column = columns[Math.floor(seeded(k * 3 + 101) * (columns.length - 1))];
+    const y = snap(column.water + step * 3 + seeded(k * 3 + 102) * block * 2.2);
+    const light = seeded(k * 3 + 103) > 0.6;
+    ctx.fillStyle = light ? (dark ? '#2f6175' : '#a5e1fb') : (dark ? '#1a3846' : '#5fbfe6');
+    ctx.fillRect(column.x, y, step * (1 + Math.floor(seeded(k * 7 + 100) * 3)), step);
+  }
+
   // Two broken foam lines that fade in and out along the shore
   ctx.save();
   ctx.fillStyle = dark ? 'rgb(196, 228, 236)' : 'rgb(255, 255, 255)';
