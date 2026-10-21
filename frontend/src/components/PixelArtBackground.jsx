@@ -541,22 +541,23 @@ function drawRipples(ctx, width, riverTop, riverHeight, block, time) {
   ctx.restore();
 }
 
-// Greens from deepest shade to sunlit tips; night is darker and cooler
+// Four flat greens from shade to sunlit tops; night is darker and cooler
 const BUSH_PALETTES = {
   dark: {
-    tones: ['#0b1c12', '#12301d', '#1b4428', '#265a32', '#357040', '#5b8f52'],
+    tones: ['#12301d', '#1f4a2c', '#2f6a3a', '#4f8a4e'],
     flower: '#f09db8',
     ground: 'rgba(40, 24, 18, 0.3)',
   },
   light: {
-    tones: ['#1c3a18', '#2a5420', '#3a7026', '#538d2c', '#7eb03a', '#bcdc68'],
+    tones: ['#2a5420', '#3f7a28', '#5f9e30', '#9cc94c'],
     flower: '#ff8da1',
     ground: 'rgba(120, 84, 52, 0.24)',
   },
 };
 
-// Bushes are dense foliage: tiers of leaf clumps, each lit from above so its
-// top is speckled with bright leaves and its underside falls into deep shade.
+// Bushes are tiers of chunky leaf clumps, each lit from above in flat bands of
+// colour (with a checkerboard where bands meet) so its top is bright and its
+// underside falls into shade.
 // Clumps are painted back (top) to front (bottom), so each clump's sunlit top
 // sits against the shaded underside of the one behind it. Edges are ragged
 // with stray leaves, and there is no hard outline.
@@ -593,22 +594,31 @@ function buildBush(seed, cols, rows) {
         const dy = (gy + 0.5 - clump.cy) / clump.r;
         const dist = Math.hypot(dx, dy);
         // Ragged leafy edge: tops may sprout past the circle, sides break up
-        const reach = 1 + (noise(gx, gy, index) - 0.5) * 0.4 + (dy < -0.4 ? 0.12 : 0);
+        const reach = 1 + (noise(gx, gy, index) - 0.5) * 0.2 + (dy < -0.4 ? 0.06 : 0);
         if (dist > reach || gy >= rows) continue;
         const lit = -dy * 0.85 - dx * 0.3 - dist * dist * 0.35 - (gy / rows) * 0.35;
-        const speckle = (noise(gx, gy, index + 50) - 0.5) * 0.7;
-        const value = lit + speckle;
-        const tone = value > 0.55 ? 5 : value > 0.25 ? 4 : value > -0.05 ? 3 : value > -0.35 ? 2 : value > -0.7 ? 1 : 0;
+        const dither = (gx + gy) % 2 === 0 ? 0.07 : -0.07;
+        const value = lit + dither;
+        const tone = value > 0.38 ? 3 : value > -0.02 ? 2 : value > -0.45 ? 1 : 0;
         grid[gy][gx] = tone;
       }
     }
   });
 
+  // Close gaps along the base so the bush sits flat on the sand
+  for (let gy = rows - 2; gy < rows; gy += 1) {
+    const row = grid[gy];
+    const first = row.findIndex((tone) => tone >= 0);
+    const last = row.length - 1 - [...row].reverse().findIndex((tone) => tone >= 0);
+    if (first < 0) continue;
+    for (let gx = first; gx <= last; gx += 1) if (row[gx] < 0) row[gx] = 0;
+  }
+
   // Stray leaves just above the upper edge
   for (let gy = 1; gy < rows * 0.6; gy += 1) {
     for (let gx = 1; gx < cols - 1; gx += 1) {
-      if (grid[gy][gx] === -1 && grid[gy + 1][gx] >= 3 && noise(gx, gy, 99) > 0.78) {
-        grid[gy][gx] = noise(gx, gy, 98) > 0.5 ? 5 : 4;
+      if (grid[gy][gx] === -1 && grid[gy + 1][gx] === 3 && noise(gx, gy, 99) > 0.88) {
+        grid[gy][gx] = 3;
       }
     }
   }
@@ -625,14 +635,14 @@ function renderBushLayer(width, height, theme, ratio) {
 
   const palette = BUSH_PALETTES[theme === 'dark' ? 'dark' : 'light'];
   const block = Math.max(3, Math.round(width / 170));
-  const cell = Math.max(2, Math.round(width / 360));
+  const cell = Math.max(3, Math.round(width / 240));
   const shoreY = height * 0.69;
   const positions = [0.16, 0.29, 0.48, 0.76, 0.88];
 
   positions.forEach((position, index) => {
     const seed = index * 31 + 7;
-    const cols = 30 + Math.floor(seeded(seed) * 9);
-    const rows = 15 + Math.floor(seeded(seed + 2) * 4);
+    const cols = 20 + Math.floor(seeded(seed) * 6);
+    const rows = 10 + Math.floor(seeded(seed + 2) * 3);
     const grid = buildBush(seed, cols, rows);
     const left = Math.round((position * width) / cell) * cell - Math.round(cols / 2) * cell;
     const bottom = Math.round((shoreY + Math.sin(index * 2.7) * block) / cell) * cell;
@@ -658,7 +668,7 @@ function renderBushLayer(width, height, theme, ratio) {
       for (let f = 0; f < flowers; f += 1) {
         const gx = 2 + Math.floor(seeded(seed + 40 + f) * (cols - 4));
         const gy = 2 + Math.floor(seeded(seed + 50 + f) * (rows * 0.6));
-        if (grid[gy][gx] >= 3) ctx.fillRect(left + gx * cell, top + gy * cell, cell, cell);
+        if (grid[gy][gx] >= 2) ctx.fillRect(left + gx * cell, top + gy * cell, cell, cell);
       }
     }
   });
