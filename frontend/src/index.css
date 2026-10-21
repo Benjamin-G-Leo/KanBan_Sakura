@@ -474,7 +474,7 @@ body {
   border: 1px solid var(--glass-border-column);
   border-radius: var(--radius-xl);
   box-shadow: var(--glass-shadow-column);
-  min-height: 300px;
+  min-height: 380px;
   transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
 }
 

@@ -98,7 +98,7 @@ function AppContent() {
       <PixelArtBackground />
 
       <header className="app-header">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1680px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
             <p className="header-eyebrow text-xs font-semibold uppercase tracking-[0.24em]">AI Kanban</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight">Project Board</h1>
@@ -171,7 +171,7 @@ function AppContent() {
       </header>
 
       {/* Top padding leaves a band of sky clear so the sun and moon stay visible */}
-      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-6 pt-[clamp(1.5rem,14vh,9rem)] sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto max-w-[1680px] px-4 pb-6 pt-[clamp(1.5rem,14vh,9rem)] sm:px-6 lg:px-8">
         <KanbanBoard />
       </main>
 

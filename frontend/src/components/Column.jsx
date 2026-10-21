@@ -8,7 +8,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
   const { setNodeRef } = useDroppable({ id: columnId });
 
   return (
-    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px]`} data-stage={columnId}>
+    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[360px] min-[1408px]:min-w-[300px]`} data-stage={columnId}>
       <div className="column-header">
         <h3 className="column-title">
           {title}
