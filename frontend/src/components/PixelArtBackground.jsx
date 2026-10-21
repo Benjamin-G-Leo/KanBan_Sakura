@@ -428,34 +428,34 @@ function seeded(n) {
   return s - Math.floor(s);
 }
 
-// Each ripple lives for a few seconds at a random spot, drifts downstream while
-// fading in and out, then respawns elsewhere. Segments step up/down by a pixel
-// so the streaks look broken and irregular rather than ruled lines.
+// Each ripple is a flat, broken glint: a few horizontal dashes of uneven length
+// on one row. It appears at a random spot, drifts downstream while fading in and
+// out, then respawns elsewhere, so the surface never shows a repeating pattern.
+// Streaks lower in the river (nearer the viewer) are longer and move faster.
 function drawRipples(ctx, width, riverTop, riverHeight, block, time) {
   const thickness = Math.max(2, Math.round(block / 3));
   const sceneAlpha = ctx.globalAlpha;
   ctx.save();
   for (let i = 0; i < RIPPLE_COUNT; i += 1) {
-    const life = 4500 + seeded(i + 1) * 7000;
+    const life = 5000 + seeded(i + 1) * 7000;
     const t = time + seeded(i + 11) * life;
     const cycle = Math.floor(t / life);
     const progress = (t % life) / life;
     const seed = i * 97 + cycle * 13;
 
     const depth = seeded(seed + 3);
-    const baseY = riverTop + block * 1.5 + depth * (riverHeight - block * 3);
-    const speed = 0.01 + depth * 0.018 + seeded(seed + 5) * 0.012;
+    const rawY = riverTop + block * 1.5 + depth * (riverHeight - block * 3);
+    const y = Math.round(rawY / thickness) * thickness;
+    const speed = 0.008 + depth * 0.014 + seeded(seed + 5) * 0.006;
+    const scale = 0.7 + depth * 0.8;
     let x = seeded(seed + 7) * (width + block * 20) - block * 10 + progress * life * speed;
-    let yOffset = 0;
 
     ctx.globalAlpha = sceneAlpha * Math.sin(progress * Math.PI);
-    const segments = 2 + Math.floor(seeded(seed + 9) * 5);
-    for (let s = 0; s < segments; s += 1) {
-      const length = block * (1 + Math.floor(seeded(seed + 20 + s) * 3));
-      const wobble = Math.round(Math.sin(x * 0.015 + time * 0.0012 + i)) * thickness;
-      ctx.fillRect(Math.round(x), Math.round(baseY + yOffset + wobble), length, thickness);
-      yOffset += Math.round((seeded(seed + 40 + s) - 0.5) * 2) * thickness;
-      x += length + (seeded(seed + 60 + s) > 0.7 ? block : 0);
+    const dashes = 2 + Math.floor(seeded(seed + 9) * 3);
+    for (let d = 0; d < dashes; d += 1) {
+      const length = Math.round(block * scale * (1 + seeded(seed + 20 + d) * 4));
+      ctx.fillRect(Math.round(x), y, length, thickness);
+      x += length + Math.round(block * scale * (0.6 + seeded(seed + 60 + d) * 1.4));
     }
   }
   ctx.restore();
