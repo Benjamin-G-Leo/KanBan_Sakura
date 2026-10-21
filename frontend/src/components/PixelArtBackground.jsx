@@ -425,9 +425,11 @@ function drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time) {
   }
 
   ctx.fillStyle = dark ? '#b58a68' : '#e2c9a1';
-  columns.forEach(({ x, top, water }) => ctx.fillRect(x, top, step, water - top));
+  // Columns overlap by 1px: at fractional device-pixel ratios, abutting edges
+  // antialias and let the hillside behind show through as vertical seams
+  columns.forEach(({ x, top, water }) => ctx.fillRect(x, top, step + 1, water - top));
   ctx.fillStyle = dark ? '#8f6b54' : '#cfae84';
-  columns.forEach(({ x, wet, water }) => ctx.fillRect(x, wet, step, water - wet));
+  columns.forEach(({ x, wet, water }) => ctx.fillRect(x, wet, step + 1, water - wet));
 
   // Pebbles and glints scattered on the dry sand
   const speckles = Math.floor(width / (block * 2.2));
@@ -442,9 +444,23 @@ function drawCoast(ctx, width, height, shoreTop, riverTop, block, dark, time) {
   }
 
   ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
-  columns.forEach(({ x, water }) => ctx.fillRect(x, water, step, height - water));
+  columns.forEach(({ x, water }) => ctx.fillRect(x, water, step + 1, height - water));
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.55)' : 'rgba(71, 108, 128, 0.22)';
-  columns.forEach(({ x, water }) => ctx.fillRect(x, water, step, step * 2));
+  // Translucent, so drawn as one stepped shape: overlapping columns would
+  // double the alpha where they meet
+  ctx.beginPath();
+  columns.forEach(({ x, water }, index) => {
+    if (index === 0) ctx.moveTo(x, water);
+    ctx.lineTo(x, water);
+    ctx.lineTo(x + step, water);
+  });
+  for (let index = columns.length - 1; index >= 0; index -= 1) {
+    const { x, water } = columns[index];
+    ctx.lineTo(x + step, water + step * 2);
+    ctx.lineTo(x, water + step * 2);
+  }
+  ctx.closePath();
+  ctx.fill();
 
   // Shallows: the same short dashes as the sand texture, in water tones, in a
   // band just off the shore
