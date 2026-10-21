@@ -8,13 +8,13 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
   const { setNodeRef } = useDroppable({ id: columnId });
 
   return (
-    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px]`}>
+    <div className={`kanban-column ${columnId} flex-1 min-w-[280px] max-w-[320px]`} data-stage={columnId}>
       <div className="column-header">
         <h3 className="column-title">
           {title}
           <span className="column-count">{tasks.length}</span>
           {isAiModeEnabled && (
-            <span className="ml-2 text-[10px] font-medium uppercase tracking-[0.12em] text-amber-300/80">
+            <span className="smart-sort-label ml-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
               Smart Priority Sort
             </span>
           )}
@@ -33,7 +33,7 @@ export function Column({ columnId, title, tasks, onTaskUpdate, onTaskDelete, onT
           ))}
         </div>
       </SortableContext>
-      <AddTaskForm columnId={columnId} onAdd={onTaskAdd} />
+      {columnId === 'todo' && <AddTaskForm onAdd={onTaskAdd} />}
     </div>
   );
 }

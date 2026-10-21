@@ -5,6 +5,20 @@ export const COLUMNS = [
   { id: 'done', title: 'Done' },
 ];
 
+// Tasks move through COLUMNS in order, one stage at a time (forward or back)
+export const getAdjacentStage = (status, direction) => {
+  const index = COLUMNS.findIndex((column) => column.id === status);
+  return COLUMNS[index + direction] ?? null;
+};
+
+export const isAdjacentStage = (from, to) => {
+  const fromIndex = COLUMNS.findIndex((column) => column.id === from);
+  const toIndex = COLUMNS.findIndex((column) => column.id === to);
+  return fromIndex !== -1 && toIndex !== -1 && Math.abs(fromIndex - toIndex) === 1;
+};
+
+export const EXPIRY_POLL_MS = 60_000;
+
 const normalizeApiBase = (value) => {
   const raw = (value || 'http://localhost:3001/api').trim();
   return raw.endsWith('/tasks') ? raw.slice(0, -'/tasks'.length) : raw;

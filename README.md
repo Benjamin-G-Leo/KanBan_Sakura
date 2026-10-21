@@ -4,10 +4,11 @@ A responsive Kanban board web app built with React, Vite, Tailwind CSS, and Node
 
 ## Features
 
-- **4-Column Layout**: To Do → In Progress → Review → Done
-- **Drag & Drop**: Reorder tasks within and between columns using @dnd-kit
+- **4-Column Layout**: To Do → In Progress → Review → Done, each with its own stage colour (sky, amber, violet, emerald)
+- **Controlled Lifecycle**: Tasks are created in To Do only and move one stage at a time, forward or back, via the card's `←` / `Next →` buttons or drag-and-drop (@dnd-kit). Drags that skip a stage are rejected.
+- **Done Auto-Clear**: Tasks are removed 24 hours after entering Done, with an in-app toast (tasks cleared while the app was closed are reported on next load)
 - **Inline Editing**: Click to edit task title and description
-- **Priority System**: High (red), Medium (yellow), Low (green) indicators
+- **Priority Pills**: High / Med / Low tag on each card
 - **Task CRUD**: Create, read, update, delete tasks via REST API
 - **Dark Mode**: Full Tailwind dark mode support with persistence
 - **Animated Background**: Pixel-art canvas scene behind the board
@@ -43,11 +44,12 @@ KanBan_Sakura/
 │   │   ├── components/
 │   │   │   ├── KanbanBoard.jsx         # Main board + DnD context
 │   │   │   ├── Column.jsx              # Sortable column wrapper
-│   │   │   ├── TaskCard.jsx            # Task display + breakdown + subtasks
-│   │   │   ├── AddTaskForm.jsx         # Inline create form
+│   │   │   ├── TaskCard.jsx            # Task display, stage moves, breakdown + subtasks
+│   │   │   ├── AddTaskForm.jsx         # Inline create form (To Do column only)
+│   │   │   ├── Toasts.jsx              # In-app notifications (e.g. Done auto-clear)
 │   │   │   ├── SettingsModal.jsx       # OpenRouter API key settings
 │   │   │   ├── PixelArtBackground.jsx  # Animated canvas background
-│   │   │   └── constants.js            # Column config, API URL
+│   │   │   └── constants.js            # Column config + stage helpers, API URL
 │   │   ├── context/
 │   │   │   ├── KanbanContext.jsx       # Centralized state (useReducer)
 │   │   │   ├── KanbanContextValue.js   # Context object
@@ -99,12 +101,15 @@ Open the app, click the settings button, and paste your OpenRouter API key. The 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/tasks` | List all tasks |
-| POST | `/api/tasks` | Create task `{title, description?, status?, priority?, isAI?}` |
-| PATCH | `/api/tasks/:id` | Update task |
+| POST | `/api/tasks` | Create task `{title, description?, priority?, isAI?}` — always created in `todo` |
+| PATCH | `/api/tasks/:id` | Update task; `status` may only move one stage forward or back |
 | DELETE | `/api/tasks/:id` | Delete task |
+| GET | `/api/tasks/expired?since=<ms>` | Tasks auto-cleared from Done since `since`: `{now, ttlMs, expired: [{id, title, expiredAt}]}` |
 
-**Valid statuses:** `todo`, `in-progress`, `review`, `done`
+**Valid statuses (in lifecycle order):** `todo`, `in-progress`, `review`, `done`
 **Valid priorities:** `low`, `medium`, `high`
+
+Entering `done` stamps a server-owned `completedAt`; leaving it clears the stamp. Expired Done tasks are purged lazily on each `/api/tasks` request (no timers, so it works on serverless). The TTL defaults to 24 hours and can be shortened for testing with `DONE_TTL_MS` (e.g. `DONE_TTL_MS=60000 npm run dev`).
 
 Tasks are kept in memory, so they reset whenever the backend restarts.
 
@@ -187,7 +192,7 @@ npm --prefix frontend run lint   # oxlint
 
 ### Backend Validation
 - Title required on create
-- Status must be one of 4 valid values
+- Status must be one of 4 valid values, and changes may only move one stage at a time
 - Priority must be low/medium/high
 - Returns 400 for invalid data, 404 for missing tasks
 

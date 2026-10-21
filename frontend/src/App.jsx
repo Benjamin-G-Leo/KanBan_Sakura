@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PixelArtBackground } from './components/PixelArtBackground';
 import { SettingsModal } from './components/SettingsModal';
+import { Toasts } from './components/Toasts';
 import { KanbanProvider } from './context/KanbanContext';
 import { useKanban } from './context/useKanban';
 
@@ -93,21 +94,21 @@ function AppContent() {
   };
 
   return (
-    <div className="app-wrapper min-h-screen bg-slate-950 text-white">
+    <div className="app-wrapper min-h-screen">
       <PixelArtBackground />
 
-      <header className="relative z-10 border-b border-white/10 bg-slate-950/50 backdrop-blur-xl">
+      <header className="app-header">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.24em] text-emerald-300/80">AI Kanban</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Project Board</h1>
+            <p className="header-eyebrow text-xs font-semibold uppercase tracking-[0.24em]">AI Kanban</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight">Project Board</h1>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
               onClick={toggleSettingsModal}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-white/10"
+              className="header-control inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm"
               aria-label="Open OpenRouter API key settings"
               title="Open OpenRouter API key settings"
             >
@@ -119,14 +120,14 @@ function AppContent() {
               <button
                 type="button"
                 onClick={toggleSuggestions}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 hover:bg-white/10"
+                className="header-control rounded-lg px-3 py-2 text-sm font-medium"
                 aria-label={suggestionsOpen ? 'Close AI Suggestions' : 'Open AI Suggestions'}
               >
                 {suggestionsOpen ? 'Close Insights' : 'Open Insights'}
               </button>
             )}
 
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200">
+            <label className="header-control inline-flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 text-sm">
               <span>AI Mode</span>
               <input
                 type="checkbox"
@@ -143,7 +144,7 @@ function AppContent() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
+              className="header-control inline-flex h-10 w-10 items-center justify-center rounded-lg"
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
@@ -174,6 +175,7 @@ function AppContent() {
       </main>
 
       <SuggestionsDrawer />
+      <Toasts />
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={toggleSettingsModal}

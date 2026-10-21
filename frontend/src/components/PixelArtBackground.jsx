@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 const PETAL_COUNT = 48;
 const STAR_COUNT = 96;
 const CLOUD_COUNT = 6;
+const RIPPLE_COUNT = 38;
 const THEME_TRANSITION_MS = 900;
 const CELESTIAL_CYCLE_MS = 180_000;
 const PIXEL = 3;
@@ -567,15 +568,48 @@ function drawWater(ctx, width, height, theme, time) {
   ctx.fillStyle = dark ? '#23485a' : '#7dd3fc';
   ctx.fillRect(0, riverTop, width, height - riverTop);
   ctx.fillStyle = dark ? 'rgba(115, 190, 205, 0.24)' : 'rgba(255, 255, 255, 0.38)';
-  for (let row = 0; row < 9; row += 1) {
-    const y = riverTop + row * ((height - riverTop) / 9) + block;
-    const offset = (time * (0.018 + row * 0.002) + row * block * 3) % (block * 12);
-    for (let x = -block * 12 + offset; x < width; x += block * 12) {
-      ctx.fillRect(x, y, block * (2 + (row % 3)), Math.max(2, block / 3));
-    }
-  }
+  drawRipples(ctx, width, riverTop, height - riverTop, block, time);
   ctx.fillStyle = dark ? 'rgba(17, 35, 46, 0.65)' : 'rgba(71, 108, 128, 0.28)';
   ctx.fillRect(0, riverTop - block, width, block * 2);
+}
+
+// Deterministic 0..1 noise so ripples need no per-frame state
+function seeded(n) {
+  const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// Each ripple lives for a few seconds at a random spot, drifts downstream while
+// fading in and out, then respawns elsewhere. Segments step up/down by a pixel
+// so the streaks look broken and irregular rather than ruled lines.
+function drawRipples(ctx, width, riverTop, riverHeight, block, time) {
+  const thickness = Math.max(2, Math.round(block / 3));
+  const sceneAlpha = ctx.globalAlpha;
+  ctx.save();
+  for (let i = 0; i < RIPPLE_COUNT; i += 1) {
+    const life = 4500 + seeded(i + 1) * 7000;
+    const t = time + seeded(i + 11) * life;
+    const cycle = Math.floor(t / life);
+    const progress = (t % life) / life;
+    const seed = i * 97 + cycle * 13;
+
+    const depth = seeded(seed + 3);
+    const baseY = riverTop + block * 1.5 + depth * (riverHeight - block * 3);
+    const speed = 0.01 + depth * 0.018 + seeded(seed + 5) * 0.012;
+    let x = seeded(seed + 7) * (width + block * 20) - block * 10 + progress * life * speed;
+    let yOffset = 0;
+
+    ctx.globalAlpha = sceneAlpha * Math.sin(progress * Math.PI);
+    const segments = 2 + Math.floor(seeded(seed + 9) * 5);
+    for (let s = 0; s < segments; s += 1) {
+      const length = block * (1 + Math.floor(seeded(seed + 20 + s) * 3));
+      const wobble = Math.round(Math.sin(x * 0.015 + time * 0.0012 + i)) * thickness;
+      ctx.fillRect(Math.round(x), Math.round(baseY + yOffset + wobble), length, thickness);
+      yOffset += Math.round((seeded(seed + 40 + s) - 0.5) * 2) * thickness;
+      x += length + (seeded(seed + 60 + s) > 0.7 ? block : 0);
+    }
+  }
+  ctx.restore();
 }
 
 function drawBushes(ctx, width, height, theme) {

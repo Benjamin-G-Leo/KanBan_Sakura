@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useKanban } from '../context/useKanban';
+import { getAdjacentStage } from './constants';
+
+const PRIORITY_LABELS = { high: 'High', medium: 'Med', low: 'Low' };
 
 export function TaskCard({ task, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -11,7 +14,10 @@ export function TaskCard({ task, onUpdate, onDelete }) {
     toggleSubtasksVisibility,
     toggleSubtask,
     isAiModeEnabled,
+    moveTask,
   } = useKanban();
+  const previousStage = getAdjacentStage(task.status, -1);
+  const nextStage = getAdjacentStage(task.status, 1);
 
   const handleSave = () => {
     onUpdate(task.id, { title: editTitle, description: editDesc });
@@ -28,14 +34,18 @@ export function TaskCard({ task, onUpdate, onDelete }) {
   const hasSubtasks = isAiModeEnabled && task.subtasks && task.subtasks.length > 0;
   const showSubtasks = task.showSubtasks && hasSubtasks;
   const priorityClass = task.priority === 'high' ? 'high' : task.priority === 'low' ? 'low' : 'medium';
+  const priorityLabel = PRIORITY_LABELS[priorityClass];
   const isAI = task.isAI || task.isAiGenerated;
 
   const completedSubtasks = hasSubtasks ? task.subtasks.filter(st => st.completed).length : 0;
 
   return (
-    <div className={'glass-card task-card ' + (isAI ? 'is-ai-generated ' : '') + (isBreakingDown ? 'breaking-down' : '')}>
+    <div
+      className={'glass-card task-card ' + (isAI ? 'is-ai-generated ' : '') + (isBreakingDown ? 'breaking-down' : '')}
+      data-stage={task.status}
+    >
       <div className='flex items-start gap-3'>
-        <div className={'task-priority-indicator ' + priorityClass} />
+        <div className='task-stage-indicator' />
         <div className='task-content flex-1 min-w-0'>
           {isEditing ? (
             <form className='task-edit-form' onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
@@ -62,6 +72,7 @@ export function TaskCard({ task, onUpdate, onDelete }) {
               <div className='flex items-start justify-between gap-2'>
                 <h4 className='task-title flex-1'>{task.title}</h4>
                 <div className='flex items-center gap-2 flex-shrink-0'>
+                  <span className={'priority-pill ' + priorityClass} title={priorityLabel + ' priority'}>{priorityLabel}</span>
                   {isAiModeEnabled && isAI && <span className='ai-badge flex-shrink-0'>AI</span>}
                   {hasSubtasks && (
                     <span className='subtask-count' style={{
@@ -175,7 +186,7 @@ export function TaskCard({ task, onUpdate, onDelete }) {
               <div className='task-actions'>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className='task-action-btn'
+                  className='task-action-btn edit'
                 >
                   Edit
                 </button>
@@ -218,6 +229,29 @@ export function TaskCard({ task, onUpdate, onDelete }) {
                 >
                   Delete
                 </button>
+                <div className='stage-moves'>
+                  {previousStage && (
+                    <button
+                      onClick={() => moveTask(task, -1)}
+                      className='task-action-btn stage-move'
+                      aria-label={'Move back to ' + previousStage.title}
+                      title={'Move back to ' + previousStage.title}
+                    >
+                      ←
+                    </button>
+                  )}
+                  {nextStage && (
+                    <button
+                      onClick={() => moveTask(task, 1)}
+                      className='task-action-btn stage-move'
+                      data-stage={nextStage.id}
+                      aria-label={'Move to ' + nextStage.title}
+                      title={'Move to ' + nextStage.title}
+                    >
+                      {nextStage.title} →
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}

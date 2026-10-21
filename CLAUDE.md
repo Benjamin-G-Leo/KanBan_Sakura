@@ -19,7 +19,8 @@ No test suite. Note: the root scripts use port **3002**; running `backend` direc
 ## Architecture
 
 **Backend (`backend/`, ESM, Express 4)**
-- `server.js` — task CRUD at `/api/tasks` (GET, POST, PATCH `/:id`, DELETE `/:id`). Validates status (`todo`, `in-progress`, `review`, `done`) and priority (`low`, `medium`, `high`); 400 on bad input, 404 on missing task.
+- `server.js` — task CRUD at `/api/tasks` (GET, POST, PATCH `/:id`, DELETE `/:id`) plus `GET /api/tasks/expired?since=`. Validates status (`todo`, `in-progress`, `review`, `done`) and priority (`low`, `medium`, `high`); 400 on bad input, 404 on missing task.
+- Lifecycle: POST always creates in `todo`; PATCH only allows a one-stage status move. Entering `done` sets server-owned `completedAt`; Done tasks older than `DONE_TTL_MS` (default 24h) are purged lazily by middleware on every `/api/tasks` request and logged for the `/expired` endpoint. Don't replace this with timers — serverless instances don't keep them alive.
 - Tasks are an **in-memory array** — they reset on every restart, and on Vercel each serverless instance has its own copy. There is no database.
 - `routes/aiRoutes.js` — `POST /api/ai/breakdown`, `POST /api/ai/suggestions`. Middleware `requireUserApiKey` reads the key from the `x-user-api-key` header and returns 401 if missing.
 - `services/aiService.js` — `callOpenRouter` / `buildCompletionRequest` (model `openrouter/free`, JSON-only system prompt).
@@ -28,7 +29,9 @@ No test suite. Note: the root scripts use port **3002**; running `backend` direc
 - `context/KanbanContext.jsx` — central `useReducer` state, API sync, AI mode; `useKanban.js` is the hook, `KanbanContextValue.js` the context object.
 - `components/` — `KanbanBoard`, `Column`, `TaskCard` (breakdown + subtasks), `AddTaskForm`, `SettingsModal` (OpenRouter key entry), `PixelArtBackground` (large animated canvas scene), `constants.js` (columns, `API_BASE` from `VITE_API_URL`).
 - `services/aiService.js` — client for the AI endpoints.
-- localStorage keys: `openrouter_api_key`, `theme`, and the AI-mode key in `KanbanContext.jsx`.
+- `Toasts.jsx` renders `toasts` from the context; `KanbanContext` polls `/api/tasks/expired` every minute and toasts cleared tasks.
+- Stage colours are CSS tokens (`--stage-*`) in `index.css`, applied via a `data-stage` attribute on columns, cards and buttons.
+- localStorage keys: `openrouter_api_key`, `theme`, `kanban_last_expiry_check`, and the AI-mode key in `KanbanContext.jsx`.
 
 ## Rules
 

@@ -1,12 +1,38 @@
-import { useReducer, useEffect, useCallback, useState } from 'react';
-import { API_URL, COLUMNS } from '../components/constants';
+import { useReducer, useEffect, useCallback, useRef } from 'react';
+import { API_URL, COLUMNS, EXPIRY_POLL_MS, getAdjacentStage, isAdjacentStage } from '../components/constants';
 import { getTaskBreakdown, getWorkflowSuggestions, createTaskFromAI } from '../services/aiService';
 import { KanbanContext } from './KanbanContextValue';
 
 const AI_MODE_STORAGE_KEY = 'kanban_ai_mode_active';
+const EXPIRY_CHECK_STORAGE_KEY = 'kanban_last_expiry_check';
+
+function formatDuration(ms) {
+  const hours = Math.round(ms / 3_600_000);
+  if (hours >= 1) return hours + (hours === 1 ? ' hour' : ' hours');
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  return minutes + (minutes === 1 ? ' minute' : ' minutes');
+}
+
+function getStoredExpiryCheck() {
+  try {
+    const value = Number(localStorage.getItem(EXPIRY_CHECK_STORAGE_KEY));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeExpiryCheck(timestamp) {
+  try {
+    localStorage.setItem(EXPIRY_CHECK_STORAGE_KEY, String(timestamp));
+  } catch {
+    // Storage unavailable; we'll just re-check from scratch next load
+  }
+}
 
 const initialState = {
   tasks: [],
+  toasts: [],
   loading: true,
   breakingDown: null,
   suggestionsOpen: false,
@@ -52,6 +78,15 @@ function kanbanReducer(state, action) {
         ...state,
         tasks: state.tasks.filter((task) => task.id !== action.payload),
       };
+    case 'REMOVE_TASKS':
+      return {
+        ...state,
+        tasks: state.tasks.filter((task) => !action.payload.includes(task.id)),
+      };
+    case 'ADD_TOAST':
+      return { ...state, toasts: [...state.toasts, action.payload] };
+    case 'DISMISS_TOAST':
+      return { ...state, toasts: state.toasts.filter((toast) => toast.id !== action.payload) };
     case 'REORDER_TASKS':
       return { ...state, tasks: action.payload };
     case 'SET_BREAKING_DOWN':
@@ -114,9 +149,19 @@ function kanbanReducer(state, action) {
 
 export function KanbanProvider({ children }) {
   const [state, dispatch] = useReducer(kanbanReducer, initialState);
+  const toastIdRef = useRef(0);
 
-  const fetchTasks = useCallback(async () => {
-    dispatch({ type: 'SET_LOADING', payload: true });
+  const addToast = useCallback((message, tone = 'info') => {
+    toastIdRef.current += 1;
+    dispatch({ type: 'ADD_TOAST', payload: { id: toastIdRef.current, message, tone } });
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    dispatch({ type: 'DISMISS_TOAST', payload: id });
+  }, []);
+
+  const fetchTasks = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const res = await fetch(API_URL);
       const data = await res.json();
@@ -147,6 +192,46 @@ export function KanbanProvider({ children }) {
     dispatch({ type: 'SET_AI_MODE_ENABLED', payload: getStoredAiMode() });
     dispatch({ type: 'SET_API_KEY_LOADED' });
   }, [fetchTasks]);
+
+  // Done tasks are cleared by the server after a TTL. Poll for anything cleared
+  // since our last check (including while the app was closed) and notify.
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkExpired = async () => {
+      const since = getStoredExpiryCheck();
+      try {
+        const res = await fetch(API_URL + '/expired?since=' + (since ?? 0));
+        if (!res.ok) return;
+        const { now, ttlMs, expired } = await res.json();
+        if (cancelled) return;
+
+        if (expired.length > 0) {
+          dispatch({ type: 'REMOVE_TASKS', payload: expired.map((entry) => entry.id) });
+          // First-ever check: sync silently rather than report old history
+          if (since !== null) {
+            const after = formatDuration(ttlMs);
+            addToast(
+              expired.length === 1
+                ? `"${expired[0].title}" was cleared from Done after ${after}.`
+                : `${expired.length} tasks were cleared from Done after ${after}.`,
+              'success'
+            );
+          }
+        }
+        storeExpiryCheck(now);
+      } catch (err) {
+        console.error('Failed to check expired tasks:', err);
+      }
+    };
+
+    checkExpired();
+    const interval = setInterval(checkExpired, EXPIRY_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [addToast]);
 
   const checkApiKey = useCallback(() => {
     const key = getStoredApiKey();
@@ -194,12 +279,18 @@ export function KanbanProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
+      if (!res.ok) {
+        // Server rejected the change (e.g. an invalid stage move); resync
+        console.error('Failed to update task:', (await res.json().catch(() => ({}))).error || res.status);
+        fetchTasks({ silent: true });
+        return;
+      }
       const updated = await res.json();
       dispatch({ type: 'UPDATE_TASK', payload: updated });
     } catch (err) {
       console.error('Failed to update task:', err);
     }
-  }, []);
+  }, [fetchTasks]);
 
   const handleTaskDelete = useCallback(async (id) => {
     try {
@@ -213,6 +304,18 @@ export function KanbanProvider({ children }) {
   const handleTaskAdd = useCallback((task) => {
     dispatch({ type: 'ADD_TASK', payload: task });
   }, []);
+
+  // direction: 1 = next stage, -1 = previous stage. Moved task goes to the bottom.
+  const moveTask = useCallback(async (task, direction) => {
+    const target = getAdjacentStage(task.status, direction);
+    if (!target) return;
+    const order = state.tasks.filter((t) => t.status === target.id).length;
+    dispatch({
+      type: 'REORDER_TASKS',
+      payload: [...state.tasks.filter((t) => t.id !== task.id), { ...task, status: target.id, order }],
+    });
+    await handleTaskUpdate(task.id, { status: target.id, order });
+  }, [state.tasks, handleTaskUpdate]);
 
   const handleDragEnd = useCallback(
     async (event) => {
@@ -253,6 +356,10 @@ export function KanbanProvider({ children }) {
 
         await Promise.all(updates.map((update) => handleTaskUpdate(update.id, { order: update.order })));
       } else {
+        if (!isAdjacentStage(activeColumn, overColumn)) {
+          addToast('Tasks move one stage at a time.');
+          return;
+        }
         const sourceTasks = state.tasks.filter((task) => task.status === activeColumn && task.id !== activeId);
         const destinationTasks = state.tasks.filter((task) => task.status === overColumn && task.id !== activeId);
         const insertAt = overTask
@@ -293,7 +400,7 @@ export function KanbanProvider({ children }) {
         )));
       }
     },
-    [state.tasks, handleTaskUpdate]
+    [state.tasks, handleTaskUpdate, addToast]
   );
 
     const handleBreakdown = useCallback(async (task) => {
@@ -399,6 +506,9 @@ export function KanbanProvider({ children }) {
     handleTaskUpdate,
     handleTaskDelete,
     handleTaskAdd,
+    moveTask,
+    toasts: state.toasts,
+    dismissToast,
     handleDragEnd,
     handleBreakdown,
     toggleSuggestions,
