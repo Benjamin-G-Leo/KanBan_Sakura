@@ -658,6 +658,26 @@ function buildBush(seed, cols, rows) {
     for (let gx = first; gx <= last; gx += 1) if (row[gx] < 0) row[gx] = 0;
   }
 
+  // Trim to a dome so the sides curve in (clumps clamped at the grid edge
+  // otherwise stack into a flat vertical side), with rounded base corners
+  const halfWidth = cols / 2 - 2;
+  for (let gy = 0; gy < rows; gy += 1) {
+    for (let gx = 0; gx < cols; gx += 1) {
+      const nx = (gx + 0.5 - cols / 2) / halfWidth;
+      const ny = (gy + 0.5 - rows) / (rows * 1.05);
+      if (nx * nx + ny * ny > 1 + (noise(gx, gy, 77) - 0.5) * 0.12) grid[gy][gx] = -1;
+    }
+    const row = grid[gy];
+    if (gy === rows - 1) {
+      const first = row.findIndex((tone) => tone >= 0);
+      const last = row.length - 1 - [...row].reverse().findIndex((tone) => tone >= 0);
+      if (first >= 0 && last - first > 4) {
+        row[first] = -1;
+        row[last] = -1;
+      }
+    }
+  }
+
   // Stray leaves just above the upper edge
   for (let gy = 1; gy < rows * 0.6; gy += 1) {
     for (let gx = 1; gx < cols - 1; gx += 1) {
